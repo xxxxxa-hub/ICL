@@ -41,8 +41,8 @@ LLM_calib3/
 ├── my_param_config.json       # Sample parameter configuration file.
 ├── Example1.ipynb             # Notebook demonstrating usage and workflows.
 ├── Example2.ipynb             # Additional example notebook.
-└── run_experiments.py         # Main script to run experiments via command-line.
-```bash
+└── run_experiments.py         # Main script to run experiments via command-line.```bash
+
 
 
 ## Installation
