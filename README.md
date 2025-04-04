@@ -22,24 +22,25 @@ LLM_calib3 is built to streamline the process of experimenting with in-context l
 
 ## Project Structure
 LLM_calib3/
-├── ICL_modules/
-│   ├── data_loader.py         # Handles data loading and preprocessing.
-│   ├── dataset_interface.py   # Provides an interface for interacting with different datasets.
-│   ├── experiment_basics.py   # Contains experiment scaffolding and basic routines.
-│   ├── functions.py           # Helper functions for experiments.
-│   └── s_random.py            # Utilities for randomized operations.
-├── datasets/
-│   ├── agnews/                # Example dataset directories (agnews, sst5, trec, etc.).
-│   └── ...                    # Add or update datasets as needed.
-├── ICL_calibrations/
-│   ├── calibration_methods.py # Implements various calibration strategies.
-│   └── new_calib.py           # Additional calibration routines.
-├── ICL_inference/
-│   └── inference.py           # Executes model inference and logs results.
-├── my_param_config.json       # Sample parameter configuration file.
-├── Example1.ipynb             # Notebook demonstrating usage and workflows.
-├── Example2.ipynb             # Additional example notebook.
-└── run_experiments.py         # Main script to run experiments via command-line.
+  ├── ICL_modules/
+  │     ├── data_loader.py         # Handles data loading and preprocessing.
+  │     ├── dataset_interface.py   # Provides an interface for interacting with different datasets.
+  │     ├── experiment_basics.py   # Contains experiment scaffolding and basic routines.
+  │     ├── functions.py           # Helper functions for experiments.
+  │     └── s_random.py            # Utilities for randomized operations.
+  ├── datasets/
+  │     ├── agnews/                # Example dataset directories (agnews, sst5, trec, etc.).
+  │     └── ...                    # Add or update datasets as needed.
+  ├── ICL_calibrations/
+  │     ├── calibration_methods.py # Implements various calibration strategies.
+  │     └── new_calib.py           # Additional calibration routines.
+  ├── ICL_inference/
+  │     └── inference.py           # Executes model inference and logs results.
+  ├── my_param_config.json         # Sample parameter configuration file.
+  ├── Example1.ipynb               # Notebook demonstrating usage and workflows.
+  ├── Example2.ipynb               # Additional example notebook.
+  └── run_experiments.py           # Main script to run experiments via command-line.
+
 
 ## Installation
 1. **Clone the Repository:**
