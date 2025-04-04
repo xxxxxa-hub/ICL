@@ -1,92 +1,83 @@
 # LLM_calib3
+**LLM_calib3** is a modular framework designed for running in-context learning (ICL) experiments with large language models (LLMs). It provides an end-to-end pipeline—from data handling and preprocessing to calibration and inference—allowing researchers and practitioners to conduct robust experiments across various datasets and configurations.
 
-LLM_calib3 is a modular framework designed for running in-context learning (ICL) experiments with language models. The project includes modules for data handling, calibration of in-context examples, and inference, allowing researchers to conduct experiments across various datasets with different configurations.
+## Table of Contents
+- [Overview](#overview)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Running Experiments](#running-experiments)
+  - [Command-Line Arguments](#command-line-arguments)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [License](#license)
+- [Contact](#contact)
+
+## Overview
+LLM_calib3 is built to streamline the process of experimenting with in-context learning by providing:
+- **Data Handling:** Easy-to-use modules for loading and preprocessing various datasets.
+- **Calibration Methods:** A suite of calibration techniques to adjust model predictions and improve reliability.
+- **Inference Modules:** Efficient routines for running inference with calibrated models.
+- **Modularity:** Clear separation of concerns with dedicated modules for each major component (data, calibration, inference), allowing for easy extensions and modifications.
 
 ## Project Structure
-
-- **LLM_calib3/**  
-  The root directory containing the main scripts, configuration files, and example notebooks.
-
-- **ICL_modules/**  
-  Contains essential utilities and helper functions:
-  - data_loader.py: Handles data loading and preprocessing.
-  - dataset_interface.py: Provides an interface for interacting with different datasets.
-  - experiment_basics.py: Defines basic routines and experiment scaffolding.
-  - functions.py and s_random.py: Contains various helper functions for experiments.
-  
-- **datasets/**  
-  Holds dataset files for experiments (e.g., agnews, sst5, trec, rotten_tomatoes, financial_phrasebank). Users can add or update datasets as needed.
-
-- **ICL_calibrations/**  
-  Implements calibration methods for in-context learning:
-  - calibration_methods.py: Defines different calibration strategies.
-  - new_calib.py: Additional calibration routines.
-
-- **ICL_inference/**  
-  Contains modules for running inference with calibrated models:
-  - inference.py: Executes the model inference and logs results.
-
-- **Other Files**  
-  - my_param_config.json: A sample parameter configuration file.
-  - Example1.ipynb and Example2.ipynb: Example notebooks demonstrating how to use the framework.
-  - run_experiments.py: Main script to run experiments with various command-line parameters.
+LLM_calib3/
+├── ICL_modules/
+│   ├── data_loader.py         # Handles data loading and preprocessing.
+│   ├── dataset_interface.py   # Provides an interface for interacting with different datasets.
+│   ├── experiment_basics.py   # Contains experiment scaffolding and basic routines.
+│   ├── functions.py           # Helper functions for experiments.
+│   └── s_random.py            # Utilities for randomized operations.
+├── datasets/
+│   ├── agnews/                # Example dataset directories (agnews, sst5, trec, etc.).
+│   └── ...                    # Add or update datasets as needed.
+├── ICL_calibrations/
+│   ├── calibration_methods.py # Implements various calibration strategies.
+│   └── new_calib.py           # Additional calibration routines.
+├── ICL_inference/
+│   └── inference.py           # Executes model inference and logs results.
+├── my_param_config.json       # Sample parameter configuration file.
+├── Example1.ipynb             # Notebook demonstrating usage and workflows.
+├── Example2.ipynb             # Additional example notebook.
+└── run_experiments.py         # Main script to run experiments via command-line.
 
 ## Installation
-
 1. **Clone the Repository:**
-   git clone https://github.com/yourusername/LLM_calib3.git
-   cd LLM_calib3
+   `git clone https://github.com/yourusername/LLM_calib3.git`
+   `cd LLM_calib3`
 
-2. **Set Up Your Environment (optional but recommended):**
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+2. **Set Up Your Environment (Optional but Recommended):**
+   Create and activate a virtual environment:
+   `python -m venv venv`
+   `source venv/bin/activate`  (On Windows: `venv\Scripts\activate`)
 
 3. **Install Dependencies:**
-   pip install -r requirements.txt
+   `pip install -r requirements.txt`
 
-## Running Experiments
+## Usage
+### Running Experiments
+The main script to run experiments is `run_experiments.py`. This script allows you to control key parameters of your experiment using command-line arguments. For example, to run an experiment on the AG News dataset with a single seed, 4-shot ICL, and using the Llama model with a specific calibration method, you can run:
+`python run_experiments.py --num_seeds 1 --datasets agnews --k_values 4 --test_samples 512 --param_config my_param_config.json --methods Baseline --models Llama`
 
-The main script to run experiments is run_experiments.py. You can specify various parameters via command-line arguments. Here’s an example command:
-
-python run_experiments.py --num_seeds 1 --datasets agnews --k_values 4 --test_samples 512 --param_config my_param_config.json --methods Baseline --models Llama
-
-### Command-Line Arguments Explanation
-
-- **--num_seeds**:  
-  The number of random seeds for running experiments, ensuring reproducibility.
-
-- **--datasets**:  
-  Specifies the dataset(s) to use. For example, agnews selects the AG News dataset.
-
-- **--k_values**:  
-  Sets the value of k for experiments (e.g., the number of examples per prompt).
-
-- **--test_samples**:  
-  The number of test samples to evaluate the model on (e.g., 512 samples).
-
-- **--param_config**:  
-  The path to a JSON configuration file containing additional parameters (e.g., my_param_config.json).
-
-- **--methods**:  
-  Chooses the calibration or experimental method to apply (e.g., Baseline). Additional methods may be available in the calibration modules.
-
-- **--models**:  
-  The model to be used for inference. For example, Llama indicates the use of the Llama language model.
-
-Note: The arguments are flexible and can be adjusted based on your experimental needs. Modify them as necessary to suit your dataset, model, and calibration method.
+### Command-Line Arguments
+- **`--num_seeds`**: The number of random seeds to use in the experiment (ensures reproducibility). Example: `--num_seeds 5`
+- **`--datasets`**: Specifies the dataset(s) to be used. If not provided, all available datasets are processed. Example: `--datasets agnews sst2`
+- **`--k_values`**: Sets the value(s) of *k*, representing the number of in-context learning examples. Example: `--k_values 4 8`
+- **`--test_samples`**: Number of test samples to evaluate on (default 512). Example: `--test_samples 600`
+- **`--param_config`**: Path to a JSON file with additional experiment parameters. Example: `--param_config my_param_config.json`
+- **`--methods`**: Calibration/experimental methods to apply (Baseline, CC, Domain, Batch, LR, etc.). Example: `--methods Baseline CC`
+- **`--models`**: Which model(s) to use for inference. Defaults to Qwen, Llama, and Mistral. Example: `--models Llama Mistral`
 
 ## Examples
+For a quick start, see the notebooks:
+- **Example1.ipynb**: Demonstrates a basic workflow with default settings.
+- **Example2.ipynb**: Shows advanced usage with multiple datasets and calibration methods.
 
-Check out Example1.ipynb and Example2.ipynb for example workflows and usage demonstrations.
-
-## Contributing
-
-Contributions are welcome! Feel free to open issues or submit pull requests if you encounter bugs or have feature suggestions.
 
 ## License
 
-[Include your license information here.]
 
 ## Contact
-
-For any questions or feedback, please contact [Your Contact Information].
+For any questions or feedback, please contact:
+**Korel Gundem**
+Email: [korelgundem@gwu.edu]
