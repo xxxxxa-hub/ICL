@@ -1,5 +1,5 @@
-# LLM_calib3
-**LLM_calib3** is a modular framework designed for running in-context learning (ICL) experiments with large language models (LLMs). It provides an end-to-end pipeline—from data handling and preprocessing to calibration and inference—allowing researchers and practitioners to conduct robust experiments across various datasets and configurations.
+# ICL
+**ICL** is a modular framework designed for running in-context learning (ICL) experiments with large language models (LLMs). It provides an end-to-end pipeline—from data handling and preprocessing to calibration and inference—allowing researchers and practitioners to conduct robust experiments across various datasets and configurations.
 
 ## Table of Contents
 - [Overview](#overview)
@@ -14,7 +14,7 @@
 - [Contact](#contact)
 
 ## Overview
-LLM_calib3 is built to streamline the process of experimenting with in-context learning by providing:
+ICL is built to streamline the process of experimenting with in-context learning by providing:
 - **Data Handling:** Easy-to-use modules for loading and preprocessing various datasets.
 - **Calibration Methods:** A suite of calibration techniques to adjust model predictions and improve reliability.
 - **Inference Modules:** Efficient routines for running inference with calibrated models.
@@ -23,7 +23,7 @@ LLM_calib3 is built to streamline the process of experimenting with in-context l
 ## Project Structure
 
 ```bash
-LLM_calib3/
+ICL/
 ├── ICL_modules/
 │   ├── data_loader.py         # Handles data loading and preprocessing.
 │   ├── dataset_interface.py   # Provides an interface for interacting with different datasets.
@@ -47,8 +47,8 @@ LLM_calib3/
 
 ## Installation
 1. **Clone the Repository:**
-   `git clone https://github.com/yourusername/LLM_calib3.git`
-   `cd LLM_calib3`
+   `git clone https://github.com/yourusername/ICL.git`
+   `cd ICL`
 
 2. **Set Up Your Environment (Optional but Recommended):**
    Create and activate a virtual environment:
