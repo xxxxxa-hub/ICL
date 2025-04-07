@@ -18,7 +18,7 @@ ICL is built to streamline the process of experimenting with in-context learning
 - **Data Handling:** Easy-to-use modules for loading and preprocessing various datasets.
 - **Calibration Methods:** A suite of calibration techniques to adjust model predictions and improve reliability.
 - **Inference Modules:** Efficient routines for running inference with calibrated models.
-- **Modularity:** Clear separation of concerns with dedicated modules for each major component (data, calibration, inference), allowing for easy extensions and modifications.
+- **Modularity:** Dedicated modules for each major component (data, calibration, inference), allowing for easy extensions and modifications.
 
 ## Project Structure
 
@@ -49,7 +49,7 @@ ICL/
    `git clone https://github.com/yourusername/ICL.git`
    `cd ICL`
 
-2. **Set Up Your Environment (Optional but Recommended):**
+2. **Set Up Your Environment:**
    Create and activate a virtual environment:
    `python -m venv venv`
    `source venv/bin/activate`  (On Windows: `venv\Scripts\activate`)
@@ -73,8 +73,8 @@ The main script to run experiments is `run_experiments.py`. This script allows y
 
 ## Examples
 For a quick start, see the notebooks:
-- **intro_to_datasets.ipynb**: Notebook demonstrating usage and workflows.Demonstrates a basic workflow with default settings.
-- **Example2.ipynb**: Shows advanced usage with multiple datasets and calibration methods.
+- **intro_to_datasets.ipynb**: Notebook demonstrating usage and workflows.
+- **example_experiments.ipynb**: Shows how experiments are run with multiple datasets and calibration methods.
 
 
 ## License
