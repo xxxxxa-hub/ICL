@@ -32,15 +32,14 @@ ICL/
 │   └── s_random.py            # Utilities for randomized operations.
 ├── datasets/
 │   ├── agnews/                # Example dataset directories (agnews, sst5, trec, etc.).
-│   └── ...                    # Add or update datasets as needed.
+│   └── ...                    
 ├── ICL_calibrations/
 │   ├── calibration_methods.py # Implements various calibration strategies.
-│   └── new_calib.py           # Additional calibration routines.
 ├── ICL_inference/
 │   └── inference.py           # Executes model inference and logs results.
 ├── my_param_config.json       # Sample parameter configuration file.
-├── Example1.ipynb             # Notebook demonstrating usage and workflows.
-├── Example2.ipynb             # Additional example notebook.
+├── intro_to_datasets.ipynb    # Notebook demonstrating usage and workflows.
+├── example_experiments.ipynb  # Notebook showing how experiments are run.
 └── run_experiments.py         # Main script to run experiments via command-line.
 ```
 
@@ -74,7 +73,7 @@ The main script to run experiments is `run_experiments.py`. This script allows y
 
 ## Examples
 For a quick start, see the notebooks:
-- **Example1.ipynb**: Demonstrates a basic workflow with default settings.
+- **intro_to_datasets.ipynb**: Notebook demonstrating usage and workflows.Demonstrates a basic workflow with default settings.
 - **Example2.ipynb**: Shows advanced usage with multiple datasets and calibration methods.
 
 
