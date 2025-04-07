@@ -39,8 +39,15 @@ class domain_calibration(calibration):
                 while len(output) < sample_length:
                     random_sample = demonstration_set[random.get_int_from_range(0, len(demonstration_set) - 1)][0][i]
                     random_sample = random_sample.split(' ')
-                    random_index = random.get_int_from_range(0, len(random_sample) - 1)
-                    output.append(random_sample[random_index])
+                    if len(random_sample) > 1:
+                        
+                        random_index = random.get_int_from_range(0, len(random_sample) - 1)  # random.get_int_from_range(0,len(random_sample)-1)
+                        output.append(random_sample[random_index]) # If random_sample has only one element or is empty, append the element if it exists or skip
+                    elif len(random_sample) == 1:
+                        output.append(random_sample[0])
+                    
+                    # random_index = random.get_int_from_range(0, len(random_sample) - 1)
+                    # output.append(random_sample[random_index])
                 output = ' '.join(output)
                 ret.append(output)
             yield ret
