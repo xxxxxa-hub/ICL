@@ -218,12 +218,12 @@ def main():
         dataset_keys = list(res["results_dic"].keys())
         print(f"Model: {model_name} -> Datasets processed: {dataset_keys}")
         
-    print(final_results)
+    # print(final_results)
     
-    # # Save final results to a pickle file
-    # with open("experiment_results.pkl", "wb") as f:
-    #     pickle.dump(final_results, f)
-    # print("\nResults saved to experiment_results.pkl")
+    # Save final results to a pickle file
+    with open("experiment_results.pkl", "wb") as f:
+        pickle.dump(final_results, f)
+    print("\nResults saved to experiment_results.pkl")
 
 
 if __name__ == "__main__":
