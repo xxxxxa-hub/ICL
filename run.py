@@ -145,7 +145,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                 if "LR" in methods_to_run:
                     print("Running LR Calibration")
                     g_average_voting = {}
-                    lr_k_shot = 6 if k == 8 else k
+                    lr_k_shot = 6 if k in [8,16] else k
 
                     for i in range(lr_k_shot):
                         experiment = experiment_basics.Experiment(dataset=splitted_dataset, k=k, seed=seed)
