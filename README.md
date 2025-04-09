@@ -67,7 +67,7 @@ The main script to run experiments is `run_experiments.py`. This script allows y
 - **`--datasets`**: Specifies the dataset(s) to be used. If not provided, all available datasets are processed. Example: `--datasets agnews sst2`
 - **`--k_values`**: Sets the value(s) of *k*, representing the number of in-context learning examples. Example: `--k_values 4 8`
 - **`--test_samples`**: Number of test samples to evaluate on (default 512). Example: `--test_samples 600`
-- **`--param_config`**: Path to a JSON file with additional experiment parameters. Example: `--param_config my_param_config.json`
+- **`--param_config`**: Path to a JSON file with additional experiment parameters for logistic regression. Example: `--param_config my_param_config.json`
 - **`--methods`**: Calibration/experimental methods to apply (Baseline, CC, Domain, Batch, LR, etc.). Example: `--methods Baseline CC`
 - **`--models`**: Which model(s) to use for inference. Defaults to Qwen, Llama, and Mistral. Example: `--models Llama Mistral`
 
