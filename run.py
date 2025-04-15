@@ -178,6 +178,8 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                             lambda row: row['score_1'] if row['label'] == 1 else row['score_0'], axis=1
                         )
                         dfs[dataset_key][f'seed_{seed}'][f'{i}'] = df
+                        params = tempcali.params_
+                        coefficients_dic[dataset_key][f'seed_{seed}'][f'{i}'] = tempcali._unpack_params(params)
 
                         lr_results = {
                             'accuracy': [],
