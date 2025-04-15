@@ -161,6 +161,7 @@ def main():
                         help="Number of test samples to use when splitting datasets (default is 512).")
     
     args = parser.parse_args()
+    print(args)
     
     # Predefined seeds list
     predefined_seeds = [
@@ -221,9 +222,13 @@ def main():
     # print(final_results)
     
     # Save final results to a pickle file
-    with open("experiment_results.pkl", "wb") as f:
+    if not os.path.exists("results"): # save to a folder named "results"
+        os.makedirs("results")
+    save_file_path = os.path.join("results", f"results_k_{args.k_values}_seeds_{args.num_seeds}_datasets_{args.datasets}_models_{args.models}.pkl")
+    
+    with open(save_file_path, "wb") as f:
         pickle.dump(final_results, f)
-    print("\nResults saved to experiment_results.pkl")
+    print("\n Results Saved")
 
 
 if __name__ == "__main__":

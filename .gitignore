@@ -1,0 +1,12 @@
+
+# Folders
+.ipynb_checkpoints/
+temp/
+bashes/
+__pycache__/
+
+# Scratch files
+ExpPlan.md
+logs/
+results/
+test*
