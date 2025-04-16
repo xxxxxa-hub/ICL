@@ -194,7 +194,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
 
                         if i != 0:
                             my_dem = tempcali._permutate(dem, i-1)
-                            sample_size = len(my_dem) // 2
+                            sample_size = min(len(my_dem) // 2,12)
                             my_dem = random.sample(my_dem, sample_size)
                         else:
                             my_dem = [1]
