@@ -107,14 +107,13 @@ def load_param_config(param_config_path, k_values):
         # Default configuration for k=4 only.
         if 4 in k_values:
             print("Using default param_dic for k=4.")
-            return {
-                4: {
-                    0: [15, 0.8],
-                    1: [5.5, 0.8],
-                    2: [5, 0.7],
-                    3: [4.5, 0.8]
-                }
-            }
+            return {"4": {
+                        "0": [90, 10],
+                        "1": [90, 10],
+                        "2": [90, 10],
+                        "3": [90, 10]
+                      }
+                    }
         else:
             raise ValueError(
                 "No param_config provided and default config is only available for k=4. "
