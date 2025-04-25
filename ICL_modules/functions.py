@@ -206,7 +206,7 @@ def average_probabilities(prob_dict, weights=None):
 
     return avg_probs
 
-def compute_weights_for_k_shot(k):
+def compute_weights_for_k_shot(k,first_k_shot=4):
     """
     Compute normalized weights for general k-shot setting.
 
@@ -217,7 +217,7 @@ def compute_weights_for_k_shot(k):
     Returns:
         List of float weights of length k.
     """
-    raw_weights = [math.perm(k, i) * (k - i) for i in range(k)]
+    raw_weights = [math.perm(k, i) * (k - i) for i in range(k)][: min(k,first_k_shot)]
     total = sum(raw_weights)
     normalized_weights = [w / total for w in raw_weights]
     return normalized_weights

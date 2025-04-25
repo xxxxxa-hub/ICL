@@ -8,6 +8,7 @@ import pandas as pd
 import itertools
 import functools
 import copy
+import time
 
 def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datasets, seeds, k_values, param_dic, methods_to_run=None):
     """
@@ -154,6 +155,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
 
                         print(f"Training LR for {i}-shot with index: {demonstration_set_index}")
 
+                        start = time.time()
                         tempcali = calibration_methods.lr_calib_scipy_1d_cos(  
                             experiment.get_label_space(),
                             use_invariance=True,
@@ -163,7 +165,8 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                             k=i,
                             max_iter=1000,
                             dic=dataset_param_dic,
-                            cosine_threshold=np.cos(np.pi/dataset_param_dic[k][i][0]).item()
+                            cosine_threshold=np.cos(np.pi/dataset_param_dic[k][i][0]).item(),
+                            verbose=True
                         )
 
                         df = tempcali.train(
@@ -173,6 +176,9 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                             k=i,
                             demonstration_set_index=demonstration_set_index
                         )
+                        end = time.time()
+                        elapsed_minutes = (end - start) / 60
+                        print(f"Training Elapsed time: {elapsed_minutes:.2f} minutes")
 
                         df['true_label_likelihood'] = df.apply(
                             lambda row: row['score_1'] if row['label'] == 1 else row['score_0'], axis=1
@@ -192,6 +198,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         random.seed(42)
                         np.random.seed(42)
 
+                        print('Selecting demonstration set for LR...')
                         if i != 0:
                             my_dem = tempcali._permutate(dem, i-1)
                             sample_size = min(len(my_dem) // 2,12)
@@ -199,6 +206,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         else:
                             my_dem = [1]
 
+                        start = time.time()
                         for dem_ind in my_dem:
                             if i == 0:
                                 dem_ind = []
@@ -229,6 +237,9 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                                 lr_results['averaged_truelabel_likelihood'].append(result0['averaged_truelabel_likelihood'])
                                 lr_results['macro_F1'].append(result0['macro_F1'])
                                 lr_results['expected_calibration_error_1'].append(result0['expected_calibration_error_1'])
+                        end = time.time()
+                        elapsed_minutes = (end - start) / 60
+                        print(f"Testing Elapsed time: {elapsed_minutes:.2f} minutes")
 
                         if i == 0:
                             continue
@@ -248,7 +259,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         print(result_avg['accuracy'])
 
                     print('Final general average voting for LR')
-                    weights = functions.compute_weights_for_k_shot(k)
+                    weights = functions.compute_weights_for_k_shot(k, first_k_shot=lr_k_shot)
                     final_avg = functions.average_probabilities(g_average_voting, weights=weights)
                     result_final_avg = experiment.run_experiment(input_prediction=final_avg.tolist())
                     results_dic[dataset_key][f'seed_{seed}'][f'{k}'][f'LR-average_voting'] = result_final_avg

@@ -149,7 +149,10 @@ def main():
                         help="Path to a JSON file with the param_dic configuration.")
     
     # Calibration methods to run (default: all methods)
-    parser.add_argument("--methods", nargs="*", default=["Baseline", "CC", "Domain", "Batch", "LR"],
+    # parser.add_argument("--methods", nargs="*", default=["Baseline", "CC", "Domain", "Batch", "LR"],
+    #                     help="List of calibration methods to run (default is all methods).")
+    
+    parser.add_argument("--methods", nargs="*", default=["LR"],
                         help="List of calibration methods to run (default is all methods).")
     
     # Models to run (default: 3 models: Qwen, Llama, Mistral)
@@ -168,6 +171,7 @@ def main():
         2206632489, 2481609806, 24520513, 1825229417, 2411013676,
         241047738, 3736665164, 167757907, 1532401219, 1486393352
     ]
+    
     if args.num_seeds > len(predefined_seeds):
         print(f"Requested {args.num_seeds} seeds but only {len(predefined_seeds)} available. Using maximum available.")
         args.num_seeds = len(predefined_seeds)

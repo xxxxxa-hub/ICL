@@ -418,6 +418,7 @@ class lr_calib_scipy_1d_cos(calibration):
         # -------------------------------
         # Run optimization.
         # -------------------------------
+        print('Optimization started...')
         res = minimize(
             func_to_minimize,
             init_params,
