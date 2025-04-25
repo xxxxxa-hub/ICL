@@ -482,7 +482,240 @@ class lr_calib_scipy_1d_cos(calibration):
                 for extra_elem in elements if extra_elem not in base_perm
             ]
             return extended_permutations    
-        
+    ##############
+
+class lr_calib_scipy_1d_cos_hinge(calibration):
+    """
+    Logistic-regression calibration with a *one-sided* soft angular penalty.
+
+    For each non-reference class c (1 … J-1) we keep the angle
+    α_c = arccos( w_c / ||(b_c, w_c)|| ) ≤ θ_max.
+    A hinge loss is added whenever α_c exceeds θ_max:
+
+        φ_c(θ) = max(0,  cos θ_max − cos α_c )
+
+    The per-class φ_c are aggregated either as an *average* (default) or
+    as a *sum*, controlled by `penalty_on`.
+
+    Because the penalty is soft, the optimisation is unconstrained and
+    solved with BFGS.
+    """
+
+    # -----------------------------------------------------------------
+    # Initialiser
+    # -----------------------------------------------------------------
+    def __init__(
+        self,
+        label_space,
+        # invariance ---------------------------------------------------
+        use_invariance=True,
+        lambda_invariance=1.0,
+        invariance_loss_type="sym_ce",
+        # soft upper-angle penalty ------------------------------------
+        use_upper_soft_angle=True,
+        lambda_angle=1.0,
+        max_angle_deg=60.0,         # θ_max   (0 < θ_max ≤ 180)
+        penalty_on="average",       # "average" | "per_class"
+        # optimisation / misc -----------------------------------------
+        max_iter=100,
+        verbose=False,
+        epsilon=1e-9,
+        # legacy flags  -----
+        constraint=False,
+        cosine_threshold=0.9,
+        k=None,
+        dic=None,
+    ):
+        super().__init__()
+        # core settings ------------------------------------------------
+        self.label_space = label_space
+        self.n_label = len(label_space)
+
+        self.use_invariance = use_invariance
+        self.lambda_invariance = lambda_invariance
+        self.invariance_loss_type = invariance_loss_type
+
+        self.use_upper_soft_angle = use_upper_soft_angle
+        self.lambda_angle = lambda_angle
+        self.max_angle_deg = float(max_angle_deg)
+        self.penalty_on = penalty_on.lower()
+        if not (0.0 < self.max_angle_deg <= 180.0):
+            raise ValueError("Require 0 < max_angle_deg ≤ 180")
+        # numeric cosine bound
+        self._cos_up = np.cos(np.deg2rad(self.max_angle_deg))
+
+        self.max_iter = max_iter
+        self.verbose = verbose
+        self.epsilon = epsilon
+
+        # legacy placeholders ----------------------------------------
+        self.constraint = constraint
+        self.cosine_threshold = cosine_threshold
+        self.k = k
+        self.dic = dic
+
+        # model params ------------------------------------------------
+        self.params_ = None
+        self.fitted_ = False
+
+    # -----------------------------------------------------------------
+    # Utilities (unchanged)
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _safe_softmax(z):
+        z = z - z.max(axis=-1, keepdims=True)
+        exp = np.exp(z)
+        return exp / exp.sum(axis=-1, keepdims=True)
+
+    def _make_features(self, prob_vec):
+        base = prob_vec[0] + self.epsilon
+        return np.log((prob_vec[1:] + self.epsilon) / base).astype(float)
+
+    def _unpack_params(self, params):
+        non_ref = params.reshape(self.n_label - 1, 2)
+        return np.vstack([np.zeros((1, 2)), non_ref])
+
+    # -----------------------------------------------------------------
+    # Core probabilistic pieces
+    # -----------------------------------------------------------------
+    def _predict_proba_from_params(self, params, X):
+        pm = self._unpack_params(params)            # (C,2)
+        logits = pm[1:, 0] + X * pm[1:, 1]          # (N,C-1)
+        logits = np.hstack([np.zeros((len(X), 1)), logits])
+        return self._safe_softmax(logits)
+
+    def _negative_log_likelihood(self, params, X, Y):
+        P = self._predict_proba_from_params(params, X)
+        return -np.log(P[np.arange(len(Y)), Y] + self.epsilon).sum()
+
+    def _invariance_penalty(self, params, X, pairs):
+        if not (self.use_invariance and pairs):
+            return 0.0
+        P = self._predict_proba_from_params(params, X)
+        i_idx = np.fromiter((i for i, _ in pairs), int)
+        j_idx = np.fromiter((j for _, j in pairs), int)
+        if self.invariance_loss_type == "mse":
+            return np.square(P[i_idx] - P[j_idx]).sum()
+        elif self.invariance_loss_type == "l1":
+            return np.abs(P[i_idx] - P[j_idx]).sum()
+        else:  # "sym_ce"
+            eps = self.epsilon
+            P_i, P_j = P[i_idx], P[j_idx]
+            return -(P_j * np.log(P_i + eps) + P_i * np.log(P_j + eps)).sum()
+
+    # -----------------------------------------------------------------
+    # NEW: upper-angle hinge penalty
+    # -----------------------------------------------------------------
+    def _upper_angle_penalty(self, params):
+        if not self.use_upper_soft_angle:
+            return 0.0
+        non_ref = params.reshape(self.n_label - 1, 2)   # (C-1,2)
+        norms = np.sqrt((non_ref ** 2).sum(axis=1) + 1e-12)
+        cosines = non_ref[:, 1] / norms                 # w / ||(b,w)||
+        violations = np.maximum(0.0, self._cos_up - cosines)
+
+        if self.penalty_on == "average":
+            return violations.mean()
+        else:  # "per_class"
+            return violations.sum()
+
+    # -----------------------------------------------------------------
+    # Full objective
+    # -----------------------------------------------------------------
+    def _objective(self, params, X, Y, pairs):
+        return (
+            self._negative_log_likelihood(params, X, Y)
+            + self.lambda_invariance * self._invariance_penalty(params, X, pairs)
+            + self.lambda_angle * self._upper_angle_penalty(params)
+        )
+
+    # -----------------------------------------------------------------
+    # Training
+    # -----------------------------------------------------------------
+    def train(
+        self,
+        default_prompt_maker,
+        feedforward,
+        demonstration_set=None,
+        k=4,
+        demonstration_set_index=None,
+    ):
+        # --------------------------------------------------------------
+        # 1) synthetic calibration set
+        # --------------------------------------------------------------
+        idx_sets = self._permutate(demonstration_set_index, k)
+        probs, labels, qids = [], [], []
+        for demo_and_query in idx_sets:
+            demo_idx, q_idx = demo_and_query[:k], demo_and_query[k]
+            prompt = default_prompt_maker(
+                [demonstration_set[j] for j in demo_idx],
+                demonstration_set[q_idx][0],
+            )
+            probs.append(feedforward(prompt=prompt, label_space=self.label_space))
+            labels.append(demonstration_set.get_label(q_idx))
+            qids.append(q_idx)
+
+        X = np.vstack([self._make_features(p) for p in probs])
+        Y = np.fromiter((self.label_space.index(l) for l in labels), int)
+
+        # invariance pairs -------------------------------------------
+        qmap = defaultdict(list)
+        for i, q in enumerate(qids):
+            qmap[q].append(i)
+        pairs = [
+            (i1, i2) for idxs in qmap.values()
+            for i1 in idxs for i2 in idxs if i1 < i2
+        ]
+
+        # --------------------------------------------------------------
+        # 2) optimisation (unconstrained)
+        # --------------------------------------------------------------
+        init = np.zeros((self.n_label - 1) * 2, dtype=float)
+        res = minimize(
+            lambda p: self._objective(p, X, Y, pairs),
+            init,
+            method="BFGS",
+            options={"maxiter": self.max_iter, "disp": self.verbose},
+        )
+        self.params_, self.fitted_ = res.x, True
+        if self.verbose:
+            print("[SCIPY]", res.message)
+
+        # --------------------------------------------------------------
+        # 3) diagnostics dataframe
+        # --------------------------------------------------------------
+        P_cal = self._predict_proba_from_params(self.params_, X)
+        df = pd.DataFrame({
+            "label": Y,
+            "query_idx": qids,
+            "pred": P_cal.argmax(axis=1),
+            **{f"score_{c}": P_cal[:, c] for c in range(self.n_label)},
+        })
+        return df
+
+    # -----------------------------------------------------------------
+    # Inference (unchanged)
+    # -----------------------------------------------------------------
+    def inference(self, label_space_prob, full_vocab_prob, hidden_state):
+        if not self.fitted_:
+            raise RuntimeError("Model not fitted yet.")
+        x = self._make_features(label_space_prob)
+        probs = self._predict_proba_from_params(self.params_, x[None, :])[0]
+        return probs.tolist()
+
+    __call__ = inference
+
+    # -----------------------------------------------------------------
+    # Permutation helper (unchanged)
+    # -----------------------------------------------------------------
+    def _permutate(self, elements, k):
+        if k == 0:
+            return [list(p) for p in itertools.permutations(elements, 1)]
+        return [
+            list(base + (extra,))
+            for base in itertools.permutations(elements, k)
+            for extra in elements if extra not in base
+        ]
 
 
 
