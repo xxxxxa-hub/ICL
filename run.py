@@ -156,16 +156,17 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         print(f"Training LR for {i}-shot with index: {demonstration_set_index}")
 
                         start = time.time()
-                        tempcali = calibration_methods.lr_calib_scipy_1d_cos(  
+                        tempcali = calibration_methods.lr_calib_scipy_1d_cos_hinge(  
                             experiment.get_label_space(),
-                            use_invariance=True,
+                            use_invariance=False,
                             lambda_invariance=dataset_param_dic[k][i][1],
                             invariance_loss_type='sym_ce',
-                            constraint=True,
-                            k=i,
+                            use_upper_soft_angle=True,
+                            lambda_angle=dataset_param_dic[k][i][1],         #strenght of regularization
+                            max_angle_deg=dataset_param_dic[k][i][0],         # θ_max   (0 < θ_max ≤ 180) 
+                            penalty_on="average",       # "average" | "per_class"
                             max_iter=1000,
                             dic=dataset_param_dic,
-                            cosine_threshold=np.cos(np.pi/dataset_param_dic[k][i][0]).item(),
                             verbose=True
                         )
 
