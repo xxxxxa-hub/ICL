@@ -1,8 +1,11 @@
+# The first value for each sub-key defines the maximum allowed deviation in degrees (e.g., 90°).
+# The second value controls the strength of the regularization penalizing deviations from the LLM.
+
 {
   "4": {
-    "0": [15, 0.8],
-    "1": [5.5, 0.8],
-    "2": [5, 0.7],
-    "3": [4.5, 0.8]
+    "0": [90, 10],
+    "1": [90, 10],
+    "2": [90, 10],
+    "3": [90, 10]
   }
 }
