@@ -151,7 +151,7 @@ def main():
     # parser.add_argument("--methods", nargs="*", default=["Baseline", "CC", "Domain", "Batch", "LR"],
     #                     help="List of calibration methods to run (default is all methods).")
     
-    parser.add_argument("--methods", nargs="*", default=["LR"],
+    parser.add_argument("--methods", nargs="*", default=["Baseline", "CC", "Domain", "Batch"],
                         help="List of calibration methods to run (default is all methods).")
     
     # Models to run (default: 3 models: Qwen, Llama, Mistral)
@@ -227,7 +227,7 @@ def main():
     # Save final results to a pickle file
     if not os.path.exists("results"): # save to a folder named "results"
         os.makedirs("results")
-    save_file_path = os.path.join("results", f"results_k_{args.k_values}_seeds_{args.num_seeds}_datasets_{args.datasets}_models_{args.models}.pkl")
+    save_file_path = os.path.join("results", f"results_k_{args.k_values}_seeds_{args.num_seeds}_datasets_{args.datasets}_models_{args.models}_baselines.pkl")
     
     with open(save_file_path, "wb") as f:
         pickle.dump(final_results, f)
