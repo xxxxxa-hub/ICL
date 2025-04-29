@@ -148,7 +148,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                     g_average_voting = {}
                     lr_k_shot = 6 if k in [8,16] else k
 
-                    for i in range(lr_k_shot):
+                    for i in range(lr_k_shot): 
                         experiment = experiment_basics.Experiment(dataset=splitted_dataset, k=k, seed=seed)
                         demonstration_set_index = experiment.demonstration_sampler[0]
                         dem = copy.deepcopy(demonstration_set_index)
@@ -165,7 +165,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                             lambda_angle=dataset_param_dic[k][i][1],         #strenght of regularization
                             max_angle_deg=dataset_param_dic[k][i][0],         # θ_max   (0 < θ_max ≤ 180) 
                             penalty_on="average",       # "average" | "per_class"
-                            max_iter=1000,
+                            max_iter=2000,
                             dic=dataset_param_dic,
                             verbose=True
                         )
@@ -202,7 +202,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         print('Selecting demonstration set for LR...')
                         if i != 0:
                             my_dem = tempcali._permutate(dem, i-1)
-                            sample_size = min(len(my_dem) // 2,12)
+                            sample_size = min(len(my_dem) // 2,24)
                             my_dem = random.sample(my_dem, sample_size)
                         else:
                             my_dem = [1]

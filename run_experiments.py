@@ -148,15 +148,16 @@ def main():
                         help="Path to a JSON file with the param_dic configuration.")
     
     # Calibration methods to run (default: all methods)
-    # parser.add_argument("--methods", nargs="*", default=["Baseline", "CC", "Domain", "Batch", "LR"],
-    #                     help="List of calibration methods to run (default is all methods).")
-    
-    parser.add_argument("--methods", nargs="*", default=["Baseline", "CC", "Domain", "Batch"],
+    parser.add_argument("--methods", nargs="*", default=["Baseline", "CC", "Domain", "Batch", "LR"],
                         help="List of calibration methods to run (default is all methods).")
     
     # Models to run (default: 3 models: Qwen, Llama, Mistral)
     parser.add_argument("--models", nargs="*", default=["Qwen", "Llama", "Mistral"],
                         help="List of model names to run experiments on.")
+    
+    # Models to run (default: 3 models: Qwen, Llama, Mistral)
+    parser.add_argument("--exp_name", type=str, default='',
+                        help="Experiment name for tracking.")
     
     # Number of test samples (default: 512)
     parser.add_argument("--test_samples", type=int, default=512,
@@ -227,7 +228,7 @@ def main():
     # Save final results to a pickle file
     if not os.path.exists("results"): # save to a folder named "results"
         os.makedirs("results")
-    save_file_path = os.path.join("results", f"results_k_{args.k_values}_seeds_{args.num_seeds}_datasets_{args.datasets}_models_{args.models}_baselines.pkl")
+    save_file_path = os.path.join("results", f"results_k_{args.k_values}_seeds_{args.num_seeds}_datasets_{args.datasets}_models_{args.models}_{args.exp_name}.pkl")
     
     with open(save_file_path, "wb") as f:
         pickle.dump(final_results, f)
