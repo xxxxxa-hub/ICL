@@ -148,7 +148,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                     g_average_voting = {}
                     lr_k_shot = 6 if k in [8,16] else k
 
-                    for i in range(lr_k_shot): 
+                    for i in range(1,lr_k_shot): 
                         experiment = experiment_basics.Experiment(dataset=splitted_dataset, k=k, seed=seed)
                         demonstration_set_index = experiment.demonstration_sampler[0]
                         dem = copy.deepcopy(demonstration_set_index)
