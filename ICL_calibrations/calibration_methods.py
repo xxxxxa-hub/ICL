@@ -655,6 +655,30 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
             labels.append(demonstration_set.get_label(q_idx))
             qids.append(q_idx)
 
+        ###
+        @staticmethod
+        def _regulazier(z, n_label):
+            if accuracy > 0.9:
+              return 60**(1/(n_label-1))
+            elif 0.9 >= accuracy > 0.7:
+              return 75**(1/(n_label-2))
+            elif 0.7 >= accuracy > 0.5:
+              return 90
+            else:
+              return 180
+
+
+        correct = [np.argmax(prob).item()==demonstration_set.find_index_from_label(lab) for prob,lab in zip(probs,labels)]
+        print(correct)
+        accuracy = np.mean(correct)
+        print(f"Accuracy: {accuracy}")
+
+        degree = _regulazier(accuracy, self.n_label)
+        self._cos_up = np.cos(np.deg2rad(degree))
+        print(f"Cosine threshold: {self._cos_up}")
+
+        ###
+
         X = np.vstack([self._make_features(p) for p in probs])
         Y = np.fromiter((self.label_space.index(l) for l in labels), int)
 
