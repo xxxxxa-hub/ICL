@@ -694,7 +694,7 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         # --------------------------------------------------------------
         # 2) optimisation (unconstrained)
         # --------------------------------------------------------------
-        init = np.zeros((self.n_label - 1) * 2, dtype=float)
+        init = np.random.randn((self.n_label - 1) * 2)
         res = minimize(
             lambda p: self._objective(p, X, Y, pairs),
             init,
