@@ -9,4 +9,5 @@ __pycache__/
 ExpPlan.md
 logs/
 results/
+results*
 test*

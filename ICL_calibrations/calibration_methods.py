@@ -645,7 +645,7 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         # --------------------------------------------------------------
         idx_sets = self._permutate(demonstration_set_index, k)
         probs, labels, qids = [], [], []
-        for demo_and_query in idx_sets:
+        for demo_and_query in idx_sets[:15000]:
             demo_idx, q_idx = demo_and_query[:k], demo_and_query[k]
             prompt = default_prompt_maker(
                 [demonstration_set[j] for j in demo_idx],
@@ -661,7 +661,7 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
             if accuracy > 0.9:
               return 60**(1/(n_label-1))
             elif 0.9 >= accuracy > 0.7:
-              return 75**(1/(n_label-2))
+              return 75**(1/(n_label-1))
             elif 0.7 >= accuracy > 0.5:
               return 90
             else:
