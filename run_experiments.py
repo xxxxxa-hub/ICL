@@ -134,6 +134,9 @@ def main():
     # Number of seeds to run (from predefined list)
     parser.add_argument("--num_seeds", type=int, default=10,
                         help="Number of seeds to run (max 10 from the predefined list).")
+    #Fixing weights to 1
+    parser.add_argument("--fix_weights", action="store_true", help="Fix weights w_c to 1 for all non‑reference classes.")
+
     
     # List of datasets to run (if not provided, run on all)
     parser.add_argument("--datasets", nargs="*", default=None,
@@ -219,6 +222,7 @@ def main():
             lr_k_shot=args.lr_k_shot,
             ablation=args.ablation,
             test_in_context_samples=args.test_in_context_samples,
+            fix_weights = args.fix_weights
         )
         final_results[model_name] = {
             "results_dic": results_dic,
