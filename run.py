@@ -10,7 +10,7 @@ import functools
 import copy
 import time
 
-def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datasets, seeds, k_values, param_dic, methods_to_run=None,lr_k_shot=6, ablation=False, test_in_context_samples = 24):
+def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datasets, seeds, k_values, param_dic, methods_to_run=None,lr_k_shot=6, ablation=False, test_in_context_samples = 24, fix_weights = False):
     """
     Generic version of the calibration runner function with all supported calibration methods.
 
@@ -154,18 +154,22 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         dem = copy.deepcopy(demonstration_set_index)
 
                         print(f"Training LR for {i}-shot with index: {demonstration_set_index}")
-
+                        if fix_weights == False:
+                            cos= True
+                        else:
+                            cos= False
                         start = time.time()
                         tempcali = calibration_methods.lr_calib_scipy_1d_cos_hinge(  
                             experiment.get_label_space(),
                             use_invariance=False,
                             lambda_invariance=dataset_param_dic[k][i][1],
                             invariance_loss_type='sym_ce',
-                            use_upper_soft_angle=True,
+                            use_upper_soft_angle=cos,
                             lambda_angle=dataset_param_dic[k][i][1],         #strenght of regularization
                             max_angle_deg=dataset_param_dic[k][i][0],         # θ_max   (0 < θ_max ≤ 180) 
                             penalty_on="average",       # "average" | "per_class"
                             max_iter=2000,
+                            fix_unit_weights=fix_weights,
                             dic=dataset_param_dic,
                             verbose=True
                         )
