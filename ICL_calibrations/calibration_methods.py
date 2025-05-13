@@ -484,6 +484,9 @@ class lr_calib_scipy_1d_cos(calibration):
             return extended_permutations    
     ##############
 
+
+
+
 class lr_calib_scipy_1d_cos_hinge(calibration):
     """
     Logistic-regression calibration with a *one-sided* soft angular penalty.
@@ -499,6 +502,11 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
 
     Because the penalty is soft, the optimisation is unconstrained and
     solved with BFGS.
+    Parameters
+    ----------
+    fix_unit_weights : bool, default False         <<< NEW / CHANGED >>>
+        If True, all non‑reference weights w_c are fixed to 1 and only
+        the biases b_c are learnt.
     """
 
     # -----------------------------------------------------------------
@@ -511,23 +519,26 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         use_invariance=True,
         lambda_invariance=1.0,
         invariance_loss_type="sym_ce",
-        # soft upper-angle penalty ------------------------------------
+        # soft upper‑angle penalty ------------------------------------
         use_upper_soft_angle=True,
         lambda_angle=1.0,
-        max_angle_deg=60.0,         # θ_max   (0 < θ_max ≤ 180)
+        max_angle_deg=60.0,         # θ_max (0 < θ_max ≤ 180)
         penalty_on="average",       # "average" | "per_class"
         # optimisation / misc -----------------------------------------
         max_iter=100,
         verbose=False,
         epsilon=1e-9,
-        # legacy flags  -----
+        # <<< NEW / CHANGED -------------------------------------------
+        fix_unit_weights: bool = False,
+        # legacy flags -------------------------------------------------
         constraint=False,
         cosine_threshold=0.9,
         k=None,
         dic=None,
     ):
         super().__init__()
-        # core settings ------------------------------------------------
+
+        # ---------------- core settings ------------------------------
         self.label_space = label_space
         self.n_label = len(label_space)
 
@@ -541,20 +552,22 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         self.penalty_on = penalty_on.lower()
         if not (0.0 < self.max_angle_deg <= 180.0):
             raise ValueError("Require 0 < max_angle_deg ≤ 180")
-        # numeric cosine bound
         self._cos_up = np.cos(np.deg2rad(self.max_angle_deg))
 
         self.max_iter = max_iter
         self.verbose = verbose
         self.epsilon = epsilon
 
-        # legacy placeholders ----------------------------------------
+        # <<< NEW / CHANGED -------------------------------------------
+        self.fix_unit_weights = bool(fix_unit_weights)
+
+        # legacy placeholders
         self.constraint = constraint
         self.cosine_threshold = cosine_threshold
         self.k = k
         self.dic = dic
 
-        # model params ------------------------------------------------
+        # model params
         self.params_ = None
         self.fitted_ = False
 
@@ -571,16 +584,31 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         base = prob_vec[0] + self.epsilon
         return np.log((prob_vec[1:] + self.epsilon) / base).astype(float)
 
+    # -----------------------------------------------------------------
+    # Parameter unpacking
+    # -----------------------------------------------------------------
     def _unpack_params(self, params):
-        non_ref = params.reshape(self.n_label - 1, 2)
-        return np.vstack([np.zeros((1, 2)), non_ref])
+        """
+        Return a (n_label, 2) matrix of [b_c, w_c].
+
+        If `fix_unit_weights` is True, `params` has length (n_label‑1)
+        and contains only biases; weights are set to 1.
+        """
+        if self.fix_unit_weights:                                    # <<< NEW / CHANGED
+            b = params.reshape(self.n_label - 1, 1)                  # (C‑1,1)
+            w = np.ones_like(b)                                      # (C‑1,1)
+            non_ref = np.hstack([b, w])                              # (C‑1,2)
+        else:
+            non_ref = params.reshape(self.n_label - 1, 2)
+        ref = np.zeros((1, 2))
+        return np.vstack([ref, non_ref])
 
     # -----------------------------------------------------------------
     # Core probabilistic pieces
     # -----------------------------------------------------------------
     def _predict_proba_from_params(self, params, X):
-        pm = self._unpack_params(params)            # (C,2)
-        logits = pm[1:, 0] + X * pm[1:, 1]          # (N,C-1)
+        pm = self._unpack_params(params)
+        logits = pm[1:, 0] + X * pm[1:, 1]
         logits = np.hstack([np.zeros((len(X), 1)), logits])
         return self._safe_softmax(logits)
 
@@ -604,20 +632,16 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
             return -(P_j * np.log(P_i + eps) + P_i * np.log(P_j + eps)).sum()
 
     # -----------------------------------------------------------------
-    # NEW: upper-angle hinge penalty
+    # upper‑angle hinge penalty
     # -----------------------------------------------------------------
     def _upper_angle_penalty(self, params):
         if not self.use_upper_soft_angle:
             return 0.0
-        non_ref = params.reshape(self.n_label - 1, 2)   # (C-1,2)
+        non_ref = self._unpack_params(params)[1:]
         norms = np.sqrt((non_ref ** 2).sum(axis=1) + 1e-12)
-        cosines = non_ref[:, 1] / norms                 # w / ||(b,w)||
+        cosines = non_ref[:, 1] / norms
         violations = np.maximum(0.0, self._cos_up - cosines)
-
-        if self.penalty_on == "average":
-            return violations.mean()
-        else:  # "per_class"
-            return violations.sum()
+        return violations.mean() if self.penalty_on == "average" else violations.sum()
 
     # -----------------------------------------------------------------
     # Full objective
@@ -640,9 +664,7 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         k=4,
         demonstration_set_index=None,
     ):
-        # --------------------------------------------------------------
-        # 1) synthetic calibration set
-        # --------------------------------------------------------------
+        # ----------- synthetic calibration set -----------------------
         idx_sets = self._permutate(demonstration_set_index, k)
         probs, labels, qids = [], [], []
         for demo_and_query in idx_sets[:5000]:
@@ -655,46 +677,20 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
             labels.append(demonstration_set.get_label(q_idx))
             qids.append(q_idx)
 
-        ###
-        @staticmethod
-        def _regulazier(z, n_label):
-            if accuracy > 0.9:
-              return 60**(1/(n_label-1))
-            elif 0.9 >= accuracy > 0.7:
-              return 75**(1/(n_label-1))
-            elif 0.7 >= accuracy > 0.5:
-              return 90
-            else:
-              return 180
-
-
-        correct = [np.argmax(prob).item()==demonstration_set.find_index_from_label(lab) for prob,lab in zip(probs,labels)]
-        print(correct)
-        accuracy = np.mean(correct)
-        print(f"Accuracy: {accuracy}")
-
-        degree = _regulazier(accuracy, self.n_label)
-        self._cos_up = np.cos(np.deg2rad(degree))
-        print(f"Cosine threshold: {self._cos_up}")
-
-        ###
-
         X = np.vstack([self._make_features(p) for p in probs])
         Y = np.fromiter((self.label_space.index(l) for l in labels), int)
 
-        # invariance pairs -------------------------------------------
+        # invariance pairs
         qmap = defaultdict(list)
         for i, q in enumerate(qids):
             qmap[q].append(i)
-        pairs = [
-            (i1, i2) for idxs in qmap.values()
-            for i1 in idxs for i2 in idxs if i1 < i2
-        ]
+        pairs = [(i1, i2) for idxs in qmap.values()
+                 for i1 in idxs for i2 in idxs if i1 < i2]
 
-        # --------------------------------------------------------------
-        # 2) optimisation (unconstrained)
-        # --------------------------------------------------------------
-        init = np.random.randn((self.n_label - 1) * 2)
+        # -------------- optimisation vector size --------------------  # <<< NEW / CHANGED
+        dim = (self.n_label - 1) if self.fix_unit_weights else (self.n_label - 1) * 2
+        init = np.random.randn(dim)                                   # <<< NEW / CHANGED
+
         res = minimize(
             lambda p: self._objective(p, X, Y, pairs),
             init,
@@ -705,17 +701,14 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         if self.verbose:
             print("[SCIPY]", res.message)
 
-        # --------------------------------------------------------------
-        # 3) diagnostics dataframe
-        # --------------------------------------------------------------
+        # diagnostics dataframe
         P_cal = self._predict_proba_from_params(self.params_, X)
-        df = pd.DataFrame({
+        return pd.DataFrame({
             "label": Y,
             "query_idx": qids,
             "pred": P_cal.argmax(axis=1),
             **{f"score_{c}": P_cal[:, c] for c in range(self.n_label)},
         })
-        return df
 
     # -----------------------------------------------------------------
     # Inference (unchanged)
@@ -742,13 +735,5 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
                 for base in itertools.permutations(elements, k)
                 for extra in elements if extra not in base
             ),
-            20000  # Limit to the first 5000 elements
+            20000
         ))
-        # [
-        #     list(base + (extra,))
-        #     for base in itertools.permutations(elements, k)
-        #     for extra in elements if extra not in base
-        # ]
-
-
-
