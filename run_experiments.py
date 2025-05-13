@@ -141,7 +141,13 @@ def main():
     
     # k_values for number of demonstrations (default is 4)
     parser.add_argument("--k_values", type=int, nargs="+", default=[4],
-                        help="List of k values for number of demonstrations (default is [4]).")
+                        help="List of k values for number of demonstrations (default is [4]).") 
+
+
+    parser.add_argument("--lr_k_shot", type=int, default=6,
+                        help="The maximum number of k-shots for a calibration learner.")
+    parser.add_argument("--ablation", action="store_true",
+                        help="Enable ablation experiments setting.")
     
     # Parameter configuration dictionary (JSON file) or use default config if not provided
     parser.add_argument("--param_config", type=str, default=None,
@@ -155,13 +161,13 @@ def main():
     parser.add_argument("--models", nargs="*", default=["Qwen", "Llama", "Mistral"],
                         help="List of model names to run experiments on.")
     
-    # Models to run (default: 3 models: Qwen, Llama, Mistral)
     parser.add_argument("--exp_name", type=str, default='',
                         help="Experiment name for tracking.")
     
-    # Number of test samples (default: 512)
     parser.add_argument("--test_samples", type=int, default=512,
                         help="Number of test samples to use when splitting datasets (default is 512).")
+    parser.add_argument("--test_in_context_samples", type=int, default=24,
+                        help="Maximum number of demonstration combination to use for inference.")
     
     args = parser.parse_args()
     print(args)
@@ -209,7 +215,10 @@ def main():
             seeds=seeds,
             k_values=args.k_values,
             param_dic=param_dic,
-            methods_to_run=args.methods
+            methods_to_run=args.methods,
+            lr_k_shot=args.lr_k_shot,
+            ablation=args.ablation,
+            test_in_context_samples=args.test_in_context_samples,
         )
         final_results[model_name] = {
             "results_dic": results_dic,

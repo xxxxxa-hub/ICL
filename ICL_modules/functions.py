@@ -217,7 +217,8 @@ def compute_weights_for_k_shot(k,first_k_shot=4):
     Returns:
         List of float weights of length k.
     """
-    raw_weights = [math.perm(k, i) * (k - i) for i in range(1,k)][: min(k,first_k_shot)-1]
+    # we limit the maximum number of training examples to 15000
+    raw_weights = [min(math.perm(k, i) * (k - i), 15000) for i in range(1,k)][: min(k,first_k_shot)-1]
     total = sum(raw_weights)
     normalized_weights = [w / total for w in raw_weights]
     return normalized_weights

@@ -645,7 +645,7 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         # --------------------------------------------------------------
         idx_sets = self._permutate(demonstration_set_index, k)
         probs, labels, qids = [], [], []
-        for demo_and_query in idx_sets[:15000]:
+        for demo_and_query in idx_sets[:5000]:
             demo_idx, q_idx = demo_and_query[:k], demo_and_query[k]
             prompt = default_prompt_maker(
                 [demonstration_set[j] for j in demo_idx],
@@ -733,13 +733,22 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
     # Permutation helper (unchanged)
     # -----------------------------------------------------------------
     def _permutate(self, elements, k):
+        from itertools import islice
         if k == 0:
             return [list(p) for p in itertools.permutations(elements, 1)]
-        return [
-            list(base + (extra,))
-            for base in itertools.permutations(elements, k)
-            for extra in elements if extra not in base
-        ]
+        return list(islice(
+            (
+                list(base + (extra,))
+                for base in itertools.permutations(elements, k)
+                for extra in elements if extra not in base
+            ),
+            20000  # Limit to the first 5000 elements
+        ))
+        # [
+        #     list(base + (extra,))
+        #     for base in itertools.permutations(elements, k)
+        #     for extra in elements if extra not in base
+        # ]
 
 
 

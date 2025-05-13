@@ -10,7 +10,7 @@ import functools
 import copy
 import time
 
-def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datasets, seeds, k_values, param_dic, methods_to_run=None):
+def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datasets, seeds, k_values, param_dic, methods_to_run=None,lr_k_shot=6, ablation=False, test_in_context_samples = 24):
     """
     Generic version of the calibration runner function with all supported calibration methods.
 
@@ -146,7 +146,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                 if "LR" in methods_to_run:
                     print("Running LR Calibration")
                     g_average_voting = {}
-                    lr_k_shot = 6 if k in [8,16] else k
+                    # lr_k_shot = 6 if k in [8,16] else k # hard set the lr_k_shot value
 
                     for i in range(1,lr_k_shot): 
                         experiment = experiment_basics.Experiment(dataset=splitted_dataset, k=k, seed=seed)
@@ -184,7 +184,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         df['true_label_likelihood'] = df.apply(
                             lambda row: row['score_1'] if row['label'] == 1 else row['score_0'], axis=1
                         )
-                        dfs[dataset_key][f'seed_{seed}'][f'{i}'] = df
+                        # dfs[dataset_key][f'seed_{seed}'][f'{i}'] = df
                         params = tempcali.params_
                         coefficients_dic[dataset_key][f'seed_{seed}'][f'{i}'] = tempcali._unpack_params(params)
 
@@ -202,7 +202,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         print('Selecting demonstration set for LR...')
                         if i != 0:
                             my_dem = tempcali._permutate(dem, i-1)
-                            sample_size = min(len(my_dem) // 2,24)
+                            sample_size = min(len(my_dem) // 2, test_in_context_samples)
                             my_dem = random.sample(my_dem, sample_size)
                         else:
                             my_dem = [1]
@@ -233,11 +233,13 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                                 break
                             else:
                                 prob_index[tuple(dem_ind)] = probs['prob.']
+                                
                                 results_dic[dataset_key][f'seed_{seed}'][f'{k}'][f'LR-{i}-{dem_ind}'] = result0
                                 lr_results['accuracy'].append(result0['accuracy'])
                                 lr_results['averaged_truelabel_likelihood'].append(result0['averaged_truelabel_likelihood'])
                                 lr_results['macro_F1'].append(result0['macro_F1'])
                                 lr_results['expected_calibration_error_1'].append(result0['expected_calibration_error_1'])
+                        
                         end = time.time()
                         elapsed_minutes = (end - start) / 60
                         print(f"Testing Elapsed time: {elapsed_minutes:.2f} minutes")
@@ -259,10 +261,24 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         results_dic[dataset_key][f'seed_{seed}'][f'{k}'][f'LR-{i}-average_voting'] = result_avg
                         print(result_avg['accuracy'])
 
-                    print('Final general average voting for LR')
-                    weights = functions.compute_weights_for_k_shot(k, first_k_shot=lr_k_shot)
-                    final_avg = functions.average_probabilities(g_average_voting, weights=weights)
-                    result_final_avg = experiment.run_experiment(input_prediction=final_avg.tolist())
-                    results_dic[dataset_key][f'seed_{seed}'][f'{k}'][f'LR-average_voting'] = result_final_avg
+                    if not ablation: # if not in ablation mode, directly generate the final average voting with all LR-k learners
+                        print('Final general average voting for LR')
+                        weights = functions.compute_weights_for_k_shot(k, first_k_shot=lr_k_shot)
+                        final_avg = functions.average_probabilities(g_average_voting, weights=weights)
+                        result_final_avg = experiment.run_experiment(input_prediction=final_avg.tolist())
+                        results_dic[dataset_key][f'seed_{seed}'][f'{k}'][f'LR-average_voting'] = result_final_avg
+                    else: 
+                        for i in range(2,lr_k_shot): # average the first i LR-k learners
+                            print(f'Final general average voting for the first {i} LR-k learners')
+                            weights = functions.compute_weights_for_k_shot(k, first_k_shot=i+1)
+                            
+                            # Build the partial g_average_voting dictionary with the first i LR-k learners
+                            partial_g = dict()
+                            for j in range(1,i+1):
+                                partial_g[f'LR-{j}'] = g_average_voting[f'LR-{j}']
+                            
+                            final_avg = functions.average_probabilities(partial_g, weights=weights)
+                            result_final_avg = experiment.run_experiment(input_prediction=final_avg.tolist())
+                            results_dic[dataset_key][f'seed_{seed}'][f'{k}'][f'LR-average_voting-first-{i}'] = result_final_avg
 
     return results_dic, dfs, coefficients_dic
