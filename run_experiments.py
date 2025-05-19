@@ -136,6 +136,7 @@ def main():
                         help="Number of seeds to run (max 10 from the predefined list).")
     #Fixing weights to 1
     parser.add_argument("--fix_weights", action="store_true", help="Fix weights w_c to 1 for all non‑reference classes.")
+    parser.add_argument("--no_angle_constraint", action="store_true", help="Disable angle constraint when training the calibration mdoel.")
 
     
     # List of datasets to run (if not provided, run on all)
@@ -222,7 +223,8 @@ def main():
             lr_k_shot=args.lr_k_shot,
             ablation=args.ablation,
             test_in_context_samples=args.test_in_context_samples,
-            fix_weights = args.fix_weights
+            fix_weights = args.fix_weights,
+            angle_constraint = not args.no_angle_constraint,
         )
         final_results[model_name] = {
             "results_dic": results_dic,

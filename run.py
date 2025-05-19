@@ -10,7 +10,7 @@ import functools
 import copy
 import time
 
-def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datasets, seeds, k_values, param_dic, methods_to_run=None,lr_k_shot=6, ablation=False, test_in_context_samples = 24, fix_weights = False):
+def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datasets, seeds, k_values, param_dic, methods_to_run=None,lr_k_shot=6, ablation=False, test_in_context_samples = 24, fix_weights = False, angle_constraint = True):
     """
     Generic version of the calibration runner function with all supported calibration methods.
 
@@ -154,14 +154,18 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         dem = copy.deepcopy(demonstration_set_index)
 
                         print(f"Training LR for {i}-shot with index: {demonstration_set_index}")
-                        if fix_weights == False:
-                            cos= True
-                        else:
+                        
+                        cos = angle_constraint
+                        invariance = True
+
+                        if fix_weights == True:
                             cos= False
+                            invariance = False
+
                         start = time.time()
                         tempcali = calibration_methods.lr_calib_scipy_1d_cos_hinge(  
                             experiment.get_label_space(),
-                            use_invariance=False,
+                            use_invariance=invariance,
                             lambda_invariance=dataset_param_dic[k][i][1],
                             invariance_loss_type='sym_ce',
                             use_upper_soft_angle=cos,
