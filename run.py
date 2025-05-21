@@ -165,7 +165,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         start = time.time()
                         tempcali = calibration_methods.lr_calib_scipy_1d_cos_hinge(  
                             experiment.get_label_space(),
-                            use_invariance=invariance,
+                            use_invariance=False,
                             lambda_invariance=dataset_param_dic[k][i][1],
                             invariance_loss_type='sym_ce',
                             use_upper_soft_angle=cos,
