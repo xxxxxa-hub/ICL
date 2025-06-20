@@ -82,7 +82,8 @@ class DatasetSplitter:
         )
     
         # For the trailing space after 'sentiment:' 
-        prompt += " "
+        # Do not add space for hh-rlhf
+        # prompt += " "
     
         return prompt
 
