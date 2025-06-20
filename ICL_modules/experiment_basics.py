@@ -179,13 +179,13 @@ class Experiment():
                     progress_units = max(1, total_samples // bar_length)
                     progress_bar = ">>" * ((index + 1) // progress_units)
                     
-                    # # Print progress bar dynamically
-                    # print(
-                    #     "\rProcess: {:>5.1f}% | {:>5} / {} | {}".format(
-                    #         percentage, index + 1, total_samples, progress_bar
-                    #     ),
-                    #     end=""
-                    # )
+                    # Print progress bar dynamically
+                    print(
+                        "\rProcess: {:>5.1f}% | {:>5} / {} | {}".format(
+                            percentage, index + 1, total_samples, progress_bar
+                        ),
+                        end=""
+                    )
 
             else:
                 prompts = []
