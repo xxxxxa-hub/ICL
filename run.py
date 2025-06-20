@@ -146,7 +146,7 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                 if "LR" in methods_to_run:
                     print("Running LR Calibration")
                     g_average_voting = {}
-                    # lr_k_shot = 6 if k in [8,16] else k # hard set the lr_k_shot value
+                    lr_k_shot = 6 if k in [8,16] else k # hard set the lr_k_shot value
 
                     for i in range(1,lr_k_shot): 
                         experiment = experiment_basics.Experiment(dataset=splitted_dataset, k=k, seed=seed)
@@ -210,7 +210,8 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                         print('Selecting demonstration set for LR...')
                         if i != 0:
                             my_dem = tempcali._permutate(dem, i-1)
-                            sample_size = test_in_context_samples  #min(len(my_dem) // 2, test_in_context_samples)
+                            # sample_size = test_in_context_samples  #min(len(my_dem) // 2, test_in_context_samples)
+                            sample_size = min(len(my_dem) // 2, test_in_context_samples)
                             my_dem = random.sample(my_dem, sample_size)
                         else:
                             my_dem = [1]
