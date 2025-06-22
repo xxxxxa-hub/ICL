@@ -82,15 +82,19 @@ def load_models(model_names):
             continue
 
         print(f"Loading {model_name} model... This may take a while if not cached.")
+        my_cache_dir = "/hpc/group/fanglab/xx102/hf-cache"
         tokenizer = AutoTokenizer.from_pretrained(
             MODEL_ID,
-            use_auth_token=HF_TOKEN
+            cache_dir=my_cache_dir
+            # use_auth_token=HF_TOKEN
         )
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_ID,
             device_map="auto",
-            torch_dtype=torch.float16,
-            use_auth_token=HF_TOKEN
+            torch_dtype=torch.bfloat16,
+            attn_implementation="flash_attention_2",
+            cache_dir=my_cache_dir
+            # use_auth_token=HF_TOKEN
         ).eval()
 
         models_to_run[model_name] = (model, tokenizer)
