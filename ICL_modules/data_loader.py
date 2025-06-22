@@ -457,7 +457,7 @@ class tweet_eval_hate(datasets_loader):
 
 
 class hh_rlhf(datasets_loader):
-    def __init__(self, tokenizer, from_cache=False, split="train"):
+    def __init__(self, from_cache=False, split="train"):
         super().__init__()
 
         self._input_text_prefixes = [""]
