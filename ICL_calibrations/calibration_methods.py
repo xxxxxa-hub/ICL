@@ -30,27 +30,72 @@ class domain_calibration(calibration):
         self.n_label = n_label
         self.calibrationA = [1e-5] * n_label
 
-    def get_domain_sample(self, demonstration_set, sample_length):
+    # Old get_domain_sample - works for text-based datasets
+    # def get_domain_sample(self, demonstration_set, sample_length):
+    #     random = s_random.Random()
+    #     breakpoint()
+    #     while True:
+    #         ret = []
+    #         for i in range(len(demonstration_set[0][0])):
+    #             output = []
+    #             while len(output) < sample_length:
+    #                 random_sample = demonstration_set[random.get_int_from_range(0, len(demonstration_set) - 1)][0][i]
+    #                 random_sample = random_sample.split(' ')
+    #                 if len(random_sample) > 1:
+                        
+    #                     random_index = random.get_int_from_range(0, len(random_sample) - 1)  # random.get_int_from_range(0,len(random_sample)-1)
+    #                     output.append(random_sample[random_index]) # If random_sample has only one element or is empty, append the element if it exists or skip
+    #                 elif len(random_sample) == 1:
+    #                     output.append(random_sample[0])
+                    
+    #                 # random_index = random.get_int_from_range(0, len(random_sample) - 1)
+    #                 # output.append(random_sample[random_index])
+    #             output = ' '.join(output)
+    #             ret.append(output)
+    #         yield ret
+
+    def get_domain_sample(self, demonstration_set, dialogue_history_length=100, option_length=64):
+        """Generate each token from random sentence and random word from the sentence"""
         random = s_random.Random()
         while True:
-            ret = []
-            for i in range(len(demonstration_set[0][0])):
-                output = []
-                while len(output) < sample_length:
-                    random_sample = demonstration_set[random.get_int_from_range(0, len(demonstration_set) - 1)][0][i]
-                    random_sample = random_sample.split(' ')
-                    if len(random_sample) > 1:
-                        
-                        random_index = random.get_int_from_range(0, len(random_sample) - 1)  # random.get_int_from_range(0,len(random_sample)-1)
-                        output.append(random_sample[random_index]) # If random_sample has only one element or is empty, append the element if it exists or skip
-                    elif len(random_sample) == 1:
-                        output.append(random_sample[0])
-                    
-                    # random_index = random.get_int_from_range(0, len(random_sample) - 1)
-                    # output.append(random_sample[random_index])
-                output = ' '.join(output)
-                ret.append(output)
-            yield ret
+            # Sample question tokens from dialogue_history
+            question_tokens = []
+            while len(question_tokens) < dialogue_history_length:
+                sample_data = demonstration_set[random.get_int_from_range(0, len(demonstration_set) - 1)][0]
+                dialogue_history = sample_data.get('dialogue_history', [])
+                for turn in dialogue_history:
+                    content = turn.get('content', '')
+                    if content:
+                        words = [word for word in content.split(' ') if word.strip()]
+                        if len(words) > 0:
+                            random_index = random.get_int_from_range(0, len(words))
+                            question_tokens.append(words[random_index])
+                            if len(question_tokens) >= dialogue_history_length:
+                                break
+                if len(question_tokens) >= dialogue_history_length:
+                    break
+            
+            # Sample answer tokens from options
+            answer_tokens = []
+            while len(answer_tokens) < 2 * option_length:
+                sample_data = demonstration_set[random.get_int_from_range(0, len(demonstration_set) - 1)][0]
+                option_a = sample_data.get('option_a', '')
+                option_b = sample_data.get('option_b', '')
+                all_option_words = []
+                all_option_words.extend([word for word in option_a.split(' ') if word.strip()])
+                all_option_words.extend([word for word in option_b.split(' ') if word.strip()])
+                if len(all_option_words) > 0:
+                    random_index = random.get_int_from_range(0, len(all_option_words) - 1)
+                    answer_tokens.append(all_option_words[random_index])
+            
+            # Create synthetic dialogue structure
+            synthetic_dialogue = {
+                'dialogue_history': [{'role': 'user', 'content': ' '.join(question_tokens[:dialogue_history_length])}],
+                'option_a': ' '.join(answer_tokens[:option_length]),
+                'option_b': ' '.join(answer_tokens[option_length:2*option_length])
+            }
+            
+            yield synthetic_dialogue
 
     def train(
         self,
@@ -62,10 +107,10 @@ class domain_calibration(calibration):
         k = 4,
         demonstration_set_index = None
     ) -> None:
-        
+
         demonstration_samples = demonstration_set_index
         
-        gen = self.get_domain_sample(demonstration_set, sample_length)
+        gen = self.get_domain_sample(demonstration_set)
         for i in range(calibration_number):
             print("\r", end="")
             print("Process: {}%, {} in {}".format(
@@ -116,7 +161,10 @@ class contextual_calibration(calibration):
                 (i + 1),
                 len(content_free)
             ), ">>" * int((i + 1) / len(content_free) * 32), end="")
-            prompt = default_prompt_maker([demonstration_set[demonstration_samples[j]] for j in range(k)], cf)
+            
+            # Dialogue
+            cf_query = {'dialogue_history':[{'role': 'user', 'content': cf[0]}], 'option_a': cf[0], 'option_b': cf[0]}
+            prompt = default_prompt_maker([demonstration_set[demonstration_samples[j]] for j in range(k)], cf_query)
             label_space_prob = feedforward(prompt = prompt, label_space = self.label_space)
             self.calibrationA = [self.calibrationA[j] + label_space_prob[j] for j in range(self.n_label)]
         self.calibrationA = [self.calibrationA[j] / len(content_free) for j in range(self.n_label)]
@@ -614,7 +662,7 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
 
     def _negative_log_likelihood(self, params, X, Y):
         P = self._predict_proba_from_params(params, X)
-        return -np.log(P[np.arange(len(Y)), Y] + self.epsilon).sum()
+        return -np.log(P[np.arange(len(Y)), Y] + self.epsilon).mean()
 
     def _invariance_penalty(self, params, X, pairs):
         if not (self.use_invariance and pairs):
@@ -623,13 +671,13 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         i_idx = np.fromiter((i for i, _ in pairs), int)
         j_idx = np.fromiter((j for _, j in pairs), int)
         if self.invariance_loss_type == "mse":
-            return np.square(P[i_idx] - P[j_idx]).sum()
+            return np.square(P[i_idx] - P[j_idx]).mean()
         elif self.invariance_loss_type == "l1":
-            return np.abs(P[i_idx] - P[j_idx]).sum()
+            return np.abs(P[i_idx] - P[j_idx]).mean()
         else:  # "sym_ce"
             eps = self.epsilon
             P_i, P_j = P[i_idx], P[j_idx]
-            return -(P_j * np.log(P_i + eps) + P_i * np.log(P_j + eps)).sum()
+            return -(P_j * np.log(P_i + eps) + P_i * np.log(P_j + eps)).mean()
 
     # -----------------------------------------------------------------
     # upper‑angle hinge penalty
@@ -663,29 +711,63 @@ class lr_calib_scipy_1d_cos_hinge(calibration):
         demonstration_set=None,
         k=4,
         demonstration_set_index=None,
+        use_cache=True,
+        cache_dir="./calibration_cache",
+        dataset_name=None,
+        seed=None,
+        original_k=None,
     ):
-        # ----------- synthetic calibration set -----------------------
-        idx_sets = self._permutate(demonstration_set_index, k)
-        probs, labels, qids = [], [], []
-        for demo_and_query in idx_sets[:5000]:
-            demo_idx, q_idx = demo_and_query[:k], demo_and_query[k]
-            prompt = default_prompt_maker(
-                [demonstration_set[j] for j in demo_idx],
-                demonstration_set[q_idx][0],
-            )
-            probs.append(feedforward(prompt=prompt, label_space=self.label_space))
-            labels.append(demonstration_set.get_label(q_idx))
-            qids.append(q_idx)
+        # ----------- Try to load from cache first -----------------------
+        if use_cache and dataset_name is not None and seed is not None:
+            try:
+                # Import cache utilities
+                import sys
+                import os
+                sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+                from calibration_cache_utils import load_cached_data
+                
+                # Use original_k (outer loop k) and k (which is actually i) for cache lookup
+                cache_k = original_k if original_k is not None else k
+                cached_data = load_cached_data(cache_dir, dataset_name, seed, cache_k, k)
+                if cached_data is not None:
+                    X, Y, pairs, qids = cached_data
+                    print(f"[CACHE] Loaded cached data for {dataset_name}, seed {seed}, k {cache_k}, i {k}")
+                    print(f"[CACHE] Data shape: X={X.shape}, Y={Y.shape}, pairs={len(pairs)}")
+                else:
+                    print(f"[CACHE] No cached data found for {dataset_name}, seed {seed}, k {cache_k}, i {k}")
+                    print(f"[CACHE] Falling back to online computation...")
+                    cached_data = None
+            except Exception as e:
+                print(f"[CACHE] Error loading cache: {e}")
+                print(f"[CACHE] Falling back to online computation...")
+                cached_data = None
+        else:
+            cached_data = None
+        
+        # ----------- Generate data if not cached ----------------------
+        if cached_data is None:
+            # Original data generation logic
+            idx_sets = self._permutate(demonstration_set_index, k)
+            probs, labels, qids = [], [], []
+            for demo_and_query in idx_sets[:5000]:
+                demo_idx, q_idx = demo_and_query[:k], demo_and_query[k]
+                prompt = default_prompt_maker(
+                    [demonstration_set[j] for j in demo_idx],
+                    demonstration_set[q_idx][0],
+                )
+                probs.append(feedforward(prompt=prompt, label_space=self.label_space))
+                labels.append(demonstration_set.get_label(q_idx))
+                qids.append(q_idx)
 
-        X = np.vstack([self._make_features(p) for p in probs])
-        Y = np.fromiter((self.label_space.index(l) for l in labels), int)
+            X = np.vstack([self._make_features(p) for p in probs])
+            Y = np.fromiter((self.label_space.index(l) for l in labels), int)
 
-        # invariance pairs
-        qmap = defaultdict(list)
-        for i, q in enumerate(qids):
-            qmap[q].append(i)
-        pairs = [(i1, i2) for idxs in qmap.values()
-                 for i1 in idxs for i2 in idxs if i1 < i2]
+            # invariance pairs
+            qmap = defaultdict(list)
+            for i, q in enumerate(qids):
+                qmap[q].append(i)
+            pairs = [(i1, i2) for idxs in qmap.values()
+                     for i1 in idxs for i2 in idxs if i1 < i2]
 
         # -------------- optimisation vector size --------------------  # <<< NEW / CHANGED
         dim = (self.n_label - 1) if self.fix_unit_weights else (self.n_label - 1) * 2
