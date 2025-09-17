@@ -8,7 +8,7 @@ def inference_standard_template(
     return [1/len(label_space)] * len(label_space)
 
 def standard_ICL_inference(
-    prompt: str,
+    prompt,  # Can be str or list[dict]
     model: callable,
     tokenizer: callable,
     label_space: list[str],
@@ -20,7 +20,21 @@ def standard_ICL_inference(
     with torch.no_grad():
         if cache_empty is not None:
             cache_empty()
-        tknzd_data = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device) 
+        
+        # Handle both string and list[dict] (chat) formats
+        if isinstance(prompt, list) and len(prompt) > 0 and isinstance(prompt[0], dict):
+            # Convert chat messages to string using chat template
+            if hasattr(tokenizer, 'apply_chat_template'):
+                prompt_text = tokenizer.apply_chat_template(prompt, tokenize=False, add_generation_prompt=True)
+            else:
+                # Fallback: simple concatenation if no chat template available
+                prompt_text = ""
+                for msg in prompt:
+                    prompt_text += f"{msg.get('role', '')}: {msg.get('content', '')}\n"
+        else:
+            prompt_text = prompt
+            
+        tknzd_data = tokenizer(prompt_text, return_tensors="pt").input_ids.to(model.device) 
         result = model(tknzd_data, output_hidden_states = True)
         full_vocab_prob = result['logits'][0][-1].detach().to(torch.float).cpu().numpy()
         last_hidden_state = result.hidden_states[-1][-1][-1].detach().to(torch.float).cpu().numpy()
@@ -79,7 +93,7 @@ import torch
 import torch.nn.functional as F
 
 def standard_ICL_inference2(
-    prompt: str,
+    prompt,  # Can be str or list[dict]
     model: callable,
     tokenizer: callable,
     label_space: list[str],
@@ -94,13 +108,27 @@ def standard_ICL_inference2(
 
     with torch.no_grad():
         cache_empty()
-        tknzd_data = tokenizer(prompt, return_tensors="pt").input_ids.to(model.device) 
+
+        # Handle both string and list[dict] (chat) formats
+        if isinstance(prompt, list) and len(prompt) > 0 and isinstance(prompt[0], dict):
+            # Convert chat messages to string using chat template
+            if hasattr(tokenizer, 'apply_chat_template'):
+                prompt_text = tokenizer.apply_chat_template(prompt, tokenize=False, add_generation_prompt=True)
+                prompt_text = prompt_text + "[["
+            else:
+                # Fallback: simple concatenation if no chat template available
+                prompt_text = ""
+                for msg in prompt:
+                    prompt_text += f"{msg.get('role', '')}: {msg.get('content', '')}\n"
+        else:
+            prompt_text = prompt
+        tknzd_data = tokenizer(prompt_text, add_special_tokens=False, return_tensors="pt").input_ids.to(model.device) 
         result = model(tknzd_data, output_hidden_states=True)
         full_vocab_logits = result['logits'][0][-1].detach().to(torch.float).cpu().numpy()
         last_hidden_state = result.hidden_states[-1][-1][-1].detach().to(torch.float).cpu().numpy()
         
         # Tokenize each label completely (could be multiple tokens per label)
-        tokenized_label_space = [tokenizer(label).input_ids for label in label_space]
+        tokenized_label_space = [tokenizer(label, add_special_tokens=False).input_ids for label in label_space]
         label_space_avg_logits = []
         for token_ids in tokenized_label_space:
             # Extract logits for all tokens in the label
