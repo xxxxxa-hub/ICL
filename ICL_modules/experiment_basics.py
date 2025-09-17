@@ -3,6 +3,7 @@ import copy
 import functools
 import random
 from typing import List
+import pickle
 
 class Experiment():
     def __init__(self, 
@@ -205,6 +206,9 @@ class Experiment():
 
         # TEST
         self.predictions = prediction
+        # pickle.dump(self.predictions, open("prediction.pkl","wb"))
+        # pickle.dump(ground_truth, open("ground_truth.pkl","wb"))
+
         final_result = {}
         for metric_name, metric_function in self.metrics.items():    
             final_result[metric_name] = metric_function(ground_truth, self.predictions)
