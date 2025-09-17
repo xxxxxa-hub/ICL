@@ -19,6 +19,7 @@ class datasets_loader():
         self._label_mapping = {} # DICT. INT to INT. Mapping from label index from _hgf_dataset to the label index of _label_space. Will be overloaded by the dataset.
         self.table = None # LIST of (STRING, STRING). The table form of the dataset. Will be create by _transform_hgf_dataset_to_table.
         self._package_path = __package__[0:-5]
+        self.conversational = False # BOOL. Whether the dataset is conversational. Default is False.
 
     def _complie_dataset(self):
         # This function is used to transform the huggingface dataset to a table. And shuffle, cut the overlength data.
@@ -35,9 +36,9 @@ class datasets_loader():
         # Should return the number of elements in the dataset.
         return len(self.table)
 
-    def __getitem__(self, index: int) -> tuple[list[str], str]:
-        # Should return a (list of strings, string). 
-        # list of string: The length is the number of input elements.
+    def __getitem__(self, index: int) -> tuple[list, str]:
+        # Should return a (list of strings or dicts, string). 
+        # list of string/dict: The length is the number of input elements.
         # string: The label.
         return (self.get_input_text(index), self.get_label(index))
     def get_dataset(self):
@@ -66,9 +67,12 @@ class datasets_loader():
     
     def get_alternate_template(self):
         return self.alternate_template
+
+    def get_conversational(self):
+        return self.conversational
         
-    def get_input_text(self, index: int) -> list[str]:
-        # Should return a list of strings. The length is the number of input elements.
+    def get_input_text(self, index: int) -> list:
+        # Should return a list of strings or dicts. The length is the number of input elements.
         return self.table[index][0]
 
     def get_label(self, index: int) -> str:
@@ -475,7 +479,8 @@ class hh_rlhf(datasets_loader):
         self._instruction = "<|im_start|>system\nYou are a helpful assistant that evaluates two responses to a user's query. Your task is to identify the preferred response by outputting only the corresponding letter, 'A' or 'B'.<|im_end|>\n"
         # The query will be embedded at the end of the combined input text,
         # so _query_prefix can remain empty or contain a final prompt like "Preferred Option: "
-        self._query_prefix = "" 
+        self._query_prefix = ""
+        self.conversational = True 
 
         self.alternate_template = {
             "instruction": [
@@ -494,8 +499,8 @@ class hh_rlhf(datasets_loader):
 
         if not from_cache:
             import datasets
-            self._hgf_dataset = datasets.load_dataset("Anthropic/hh-rlhf")['train']
-            self._complie_dataset(tokenizer)
+            self._hgf_dataset = datasets.load_dataset("Dahoas/full-hh-rlhf")['train']
+            self._complie_dataset()
 
             cache_file_name = f"datasets/hh_rlhf.dataset"
             pickle.dump(self.table, open(cache_file_name, "wb"))
@@ -506,103 +511,166 @@ class hh_rlhf(datasets_loader):
             self.table = pickle.loads(pickle_file)
 
 
-    def _complie_dataset(self, tokenizer):
+    def _complie_dataset(self):
         self.table = []
-        breakpoint()
         for i in range(len(self._hgf_dataset)):
-            original_chosen_text = self._hgf_dataset[i]["chosen"]
-            original_rejected_text = self._hgf_dataset[i]["rejected"]
+            prompt = self._hgf_dataset[i]["prompt"].replace("  ", " ").strip()
+            chosen = self._hgf_dataset[i]["chosen"].replace("  ", " ").strip()
+            rejected = self._hgf_dataset[i]["rejected"].replace("  ", " ").strip()
             
-            formatted_chat_list, preferred_response = format_hh_row_as_chat_list(original_chosen_text, original_rejected_text)
-            full_prompt_string = tokenizer.apply_chat_template(formatted_chat_list, tokenize=False, add_generation_prompt=True)
+            # Parse the prompt to get dialogue history
+            dialogue_history = parse_hh_conversation(prompt)
             
-            system_end_pos = full_prompt_string.find("<|im_end|>\n")
-            full_prompt_string_without_system = full_prompt_string[system_end_pos + len("<|im_end|>\n"):]
+            # Randomize which response is A and which is B to prevent positional bias
+            if random.choice([True, False]):
+                option_a = chosen
+                option_b = rejected
+                preferred_response = 0  # A is preferred (chosen)
+            else:
+                option_a = rejected
+                option_b = chosen
+                preferred_response = 1  # B is preferred (chosen)
+            
+            # Store as list of dicts containing the structured conversation data
+            conversation_data = {
+                "dialogue_history": dialogue_history,
+                "option_a": option_a,
+                "option_b": option_b,
+            }
             
             self.table.append((
-                [full_prompt_string_without_system], # Input is a list with one combined string
+                conversation_data,  # Input is a list with one dict containing conversation structure
                 preferred_response
             ))
 
         del self._hgf_dataset # Free up memory
         self._shuffle() # Shuffle the combined dataset
 
-    def get_input_text(self, index: int) -> list[str]:
-        # Returns a list containing one combined string (dialogue + options)
+    def get_input_text(self, index: int) -> list[dict]:
+        # Returns a list containing one dict with conversation structure
         return self.table[index][0]
 
     def get_label(self, index: int) -> str:
-        # Returns either 'Option A' or 'Option B'
+        # Returns either 'A' or 'B'
         return self.label_index_to_text(self.table[index][1])
 
 
 def parse_hh_conversation(conversation_string):
     """
-    Parses a full conversation string from the hh-rlhf dataset into a
-    dialogue history and the final assistant response.
-    (This function is unchanged from the previous example)
+    Parses a conversation string from the hh-rlhf dataset into a
+    dialogue history as a list of dicts with "role" and "content" keys.
+    Role values are "user" and "assistant".
     """
-    last_assistant_pos = conversation_string.rfind("\n\nAssistant:")
-    if last_assistant_pos == -1:
-        return [], ""
-
-    context = conversation_string[:last_assistant_pos]
-    final_response = conversation_string[last_assistant_pos + len("\n\nAssistant:"):].strip()
-    
     dialogue_history = []
-    turns = context.strip().split("\n\n")
+    
+    # Split by double newlines to get individual turns
+    turns = conversation_string.strip().split("\n\n")
     
     for turn in turns:
         if turn.startswith("Human:"):
-            # The standard role for the user is 'user'
             role = "user"
             content = turn[len("Human:"):].strip()
             dialogue_history.append({"role": role, "content": content})
         elif turn.startswith("Assistant:"):
-            # The standard role for the assistant is 'assistant'
             role = "assistant"
             content = turn[len("Assistant:"):].strip()
-            dialogue_history.append({"role": role, "content": content})
+            # Only add assistant turns with non-empty content
+            if content:
+                dialogue_history.append({"role": role, "content": content})
             
-    return dialogue_history, final_response
+    return dialogue_history
 
 
-def format_hh_row_as_chat_list(chosen_str, rejected_str):
-    """
-    Takes a row from the hh-rlhf dataset and formats it into a list of
-    dictionaries suitable for chat model fine-tuning.
-    
-    Randomly assigns chosen/rejected to A/B to prevent positional bias.
-    """
-    dialogue_history, chosen_response = parse_hh_conversation(chosen_str)
-    _, rejected_response = parse_hh_conversation(rejected_str)
-    
-    # Randomize which response is A and which is B
-    if random.choice([True, False]):
-        option_a = chosen_response
-        option_b = rejected_response
-        preferred_response = 0
-    else:
-        option_a = rejected_response
-        option_b = chosen_response
-        preferred_response = 1
+class ultrafeedback(datasets_loader):
+    def __init__(self, from_cache=False, split="train"):
+        super().__init__()
 
-    # --- Assemble the final list of dictionaries ---
-    
-    messages = []
-    # 2. Add the dialogue history (context)
-    messages.extend(dialogue_history)
-    
-    # 3. Add the final user turn, which presents the choice
-    final_user_content = (
-        "The assistant provided two different responses to the last user query. Please identify which response is preferred.\n\n"
-        f"Response A: {option_a}\n\n"
-        f"Response B: {option_b}\n\n"
-        "Preferred Response: "
-    )
-    messages.append({
-        "role": "user",
-        "content": final_user_content
-    })
-    
-    return messages, preferred_response
+        self._input_text_prefixes = [""]
+        self._input_text_affixes = [""] # End of the combined input string before label
+        self._label_space = ["A", "B"]
+        self._label_prefix = "" # Or "Preference: ", "Choose: "
+        self._label_affix = "<|im_end|>\n"
+
+        # Mapping for these two labels (0 for Option A, 1 for Option B)
+        self._label_mapping = {0: 0, 1: 1}
+        
+        self.dataset_name = "ultrafeedback"
+        self.input_element_numbers = 1 # Each example now has a single combined text input
+        self.label_space_numbers = len(self._label_space) # Will be 2
+        self._instruction = "<|im_start|>system\nYou are a helpful assistant that evaluates two responses to a user's query. Your task is to identify the preferred response by outputting only the corresponding letter, 'A' or 'B'.<|im_end|>\n"
+        # The query will be embedded at the end of the combined input text,
+        # so _query_prefix can remain empty or contain a final prompt like "Preferred Option: "
+        self._query_prefix = ""
+        self.conversational = True 
+
+        self.alternate_template = {
+            "instruction": [
+                "", # Empty instruction
+                "Which of the two provided options in the following dialogue is better?",
+                "Select the more helpful and harmless option for the given conversation."
+            ],
+            "input_text_prefixes": [
+                ["Dialogue: "],
+                ["Conversation: "],
+                ["Text: "]
+            ],
+            "label_prefix": ["Preferred Option: ", "Choice: ", "Best Option: "],
+            "label_affix": ["\n", " ", "\t"],
+        }
+
+        if not from_cache:
+            import datasets
+            self._hgf_dataset = datasets.load_dataset("Alligator123/gemma2-ultrafeedback-armorm-false_qa")['test']
+            self._complie_dataset()
+
+            cache_file_name = f"datasets/ultrafeedback.dataset"
+            pickle.dump(self.table, open(cache_file_name, "wb"))
+        else:
+            cache_file_name = f"datasets/ultrafeedback.dataset"
+            with open(cache_file_name, "rb") as f:
+                pickle_file = f.read()
+            self.table = pickle.loads(pickle_file)
+
+
+    def _complie_dataset(self):
+        self.table = []
+        for i in range(len(self._hgf_dataset)):
+            prompt = self._hgf_dataset[i]["prompt"]
+            chosen = self._hgf_dataset[i]["chosen"][-1]['content']
+            rejected = self._hgf_dataset[i]["rejected"][-1]['content']
+            
+            # Parse the prompt to get dialogue history
+            dialogue_history = [{"role": "user", "content": prompt}]
+            
+            # Randomize which response is A and which is B to prevent positional bias
+            if random.choice([True, False]):
+                option_a = chosen
+                option_b = rejected
+                preferred_response = 0  # A is preferred (chosen)
+            else:
+                option_a = rejected
+                option_b = chosen
+                preferred_response = 1  # B is preferred (chosen)
+            
+            # Store as list of dicts containing the structured conversation data
+            conversation_data = {
+                "dialogue_history": dialogue_history,
+                "option_a": option_a,
+                "option_b": option_b,
+            }
+            
+            self.table.append((
+                conversation_data,  # Input is a list with one dict containing conversation structure
+                preferred_response
+            ))
+
+        del self._hgf_dataset # Free up memory
+        self._shuffle() # Shuffle the combined dataset
+
+    def get_input_text(self, index: int) -> list[dict]:
+        # Returns a list containing one dict with conversation structure
+        return self.table[index][0]
+
+    def get_label(self, index: int) -> str:
+        # Returns either 'A' or 'B'
+        return self.label_index_to_text(self.table[index][1])
