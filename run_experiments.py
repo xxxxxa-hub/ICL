@@ -20,13 +20,13 @@ from ICL_inference import inference
 from ICL_calibrations import calibration_methods
 
 # Import transformers for model/tokenizer loading
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 
 # Import your main experiment runner function
 from run import run_multiple_calibration_experiments_generic  # Adjust the import path as necessary
 
 
-def load_datasets(selected_datasets=None, test_samples=512, split_seed=107):
+def load_datasets(selected_datasets=None, test_samples=512, split_seed=107, permute_demonstrations=True):
     """
     Auto-detect and load datasets.
     If selected_datasets is provided (as a list), only those datasets are loaded.
@@ -47,7 +47,7 @@ def load_datasets(selected_datasets=None, test_samples=512, split_seed=107):
             print(f"Loading and splitting: {name}")
             dataset = load_fn(from_cache=True)
             train_samples = len(dataset) - test_samples
-            splitted = dataset_interface.DatasetSplitter(dataset, train_samples, test_samples, split_seed)
+            splitted = dataset_interface.DatasetSplitter(dataset, train_samples, test_samples, split_seed, permute_demonstrations)
             all_splitted_datasets.append(splitted)
         except Exception as e:
             print(f"Skipping {name} due to error: {e}")
@@ -70,9 +70,9 @@ def load_models(model_names):
         name_lower = model_name.lower()
         if name_lower in ["qwen", "qwen2", "qwen2-7b", "qwen2-7b-instruct"]:
             MODEL_ID = "Qwen/Qwen2-7B-Instruct"
-            HF_TOKEN = "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"
+            HF_TOKEN = "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"
         elif name_lower in ["llama", "llama2", "llama-2", "llama-2-7b", "llama-2-7b-chat-hf"]:
-            MODEL_ID = "meta-llama/Llama-2-7b-chat-hf"
+            MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
             HF_TOKEN = "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"
         elif name_lower in ["mistral", "mistralai", "mistralai-7b", "mistralai-7b-instruct-v0.3"]:
             MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.3"
@@ -82,19 +82,23 @@ def load_models(model_names):
             continue
 
         print(f"Loading {model_name} model... This may take a while if not cached.")
-        my_cache_dir = "/hpc/group/fanglab/xx102/hf-cache"
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,                 # 或 load_in_8bit=True
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",         # 常用 nf4
+        )
+
         tokenizer = AutoTokenizer.from_pretrained(
-            MODEL_ID,
-            cache_dir=my_cache_dir
-            # use_auth_token=HF_TOKEN
+            MODEL_ID
         )
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_ID,
             device_map="auto",
             torch_dtype=torch.bfloat16,
             attn_implementation="flash_attention_2",
-            cache_dir=my_cache_dir
-            # use_auth_token=HF_TOKEN
+            quantization_config=bnb_config,
         ).eval()
 
         models_to_run[model_name] = (model, tokenizer)
@@ -107,29 +111,65 @@ def load_param_config(param_config_path, k_values):
     Load parameter configuration from JSON if provided.
     If not, use a default config for k=4.
     """
-    if param_config_path is None:
-        # Default configuration for k=4 only.
-        if 4 in k_values:
-            print("Using default param_dic for k=4.")
-            return {"4": {
-                        "0": [90, 10],
-                        "1": [90, 10],
-                        "2": [90, 10],
-                        "3": [90, 10]
-                      }
-                    }
-        else:
-            raise ValueError(
-                "No param_config provided and default config is only available for k=4. "
-                f"Please provide a JSON file with param_dic for k_values: {k_values}"
-            )
-    else:
-        print(f"Loading param_dic from {param_config_path}")
-        with open(param_config_path, "r") as f:
-            param_dic = json.load(f)
-        # Convert keys to integers if necessary
-        param_dic = {int(k): {int(sub_k): v for sub_k, v in sub_dic.items()} for k, sub_dic in param_dic.items()}
-        return param_dic
+    param_dic = {
+      4: {
+        # 0: [90, 10],
+        1: [90, 0.05],
+        2: [90, 0.1],
+        3: [90, 0.1]
+      },
+    #   8: {
+    #     # 0: [90, 2],
+    #     1: [45, 2.0],
+    #     2: [60, 0.05],
+    #     3: [45, 0.1],
+    #     4: [90, 0.05],
+    #     5: [60, 0.05],
+    #     # 6: [90, 2],
+    #     # 7: [90, 2]
+    #   },
+    # 16: {
+    #     # 0: [90, 10],
+    #     1: [75, 0.02],
+    #     2: [75, 2.0],
+    #     3: [75, 1.0],
+    #     4: [90, 2.0],
+    #     5: [90, 2.0],
+    #     # 6: [90, 10],
+    #     # 7: [90, 10],
+    #     # 8: [90, 10],
+    #     # 9: [90, 10],
+    #     # 10: [90, 10],
+    #     # 11: [90, 10],
+    #     # 12: [90, 10],
+    #     # 13: [90, 10],
+    #     # 14: [90, 10],
+    #     # 15: [90, 10]
+    # }
+    }
+    # if param_config_path is None:
+    #     # Default configuration for k=4 only.
+    #     if 4 in k_values:
+    #         print("Using default param_dic for k=4.")
+    #         return {4: {
+    #                     0: [90, 10],
+    #                     1: [90, 10],
+    #                     2: [90, 10],
+    #                     3: [90, 10]
+    #                   }
+    #                 }
+    #     else:
+    #         raise ValueError(
+    #             "No param_config provided and default config is only available for k=4. "
+    #             f"Please provide a JSON file with param_dic for k_values: {k_values}"
+    #         )
+    # else:
+    #     print(f"Loading param_dic from {param_config_path}")
+    #     with open(param_config_path, "r") as f:
+    #         param_dic = json.load(f)
+    #     # Convert keys to integers if necessary
+    #     param_dic = {int(k): {int(sub_k): v for sub_k, v in sub_dic.items()} for k, sub_dic in param_dic.items()}
+    return param_dic
 
 
 def main():
@@ -172,11 +212,13 @@ def main():
     parser.add_argument("--exp_name", type=str, default='',
                         help="Experiment name for tracking.")
     
-    parser.add_argument("--test_samples", type=int, default=512,
+    parser.add_argument("--test_samples", type=int, default=32,
                         help="Number of test samples to use when splitting datasets (default is 512).")
     parser.add_argument("--test_in_context_samples", type=int, default=24,
                         help="Maximum number of demonstration combination to use for inference.")
-    
+    parser.add_argument("--permute_demonstrations", action="store_true", default=False,
+                        help="Whether to permute demonstrations during dataset splitting (default: False).")
+
     args = parser.parse_args()
     print(args)
     
@@ -195,7 +237,8 @@ def main():
     all_splitted_datasets = load_datasets(
         selected_datasets=args.datasets,
         test_samples=args.test_samples,
-        split_seed=107
+        split_seed=107,
+        permute_demonstrations=args.permute_demonstrations
     )
     if not all_splitted_datasets:
         print("No datasets were loaded. Exiting.")
@@ -247,7 +290,7 @@ def main():
     # Save final results to a pickle file
     if not os.path.exists("results"): # save to a folder named "results"
         os.makedirs("results")
-    save_file_path = os.path.join("results", f"results_k_{args.k_values}_seeds_{args.num_seeds}_datasets_{args.datasets}_models_{args.models}_{args.exp_name}.pkl")
+    save_file_path = os.path.join("results", f"results_k_{args.k_values}_seeds_{args.num_seeds}_datasets_{args.datasets}_models_{args.models}_predict_ab.pkl")
     
     with open(save_file_path, "wb") as f:
         pickle.dump(final_results, f)

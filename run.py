@@ -183,7 +183,12 @@ def run_multiple_calibration_experiments_generic(model,tokenizer,splitted_datase
                             inference_base,
                             experiment.demonstration_set(),
                             k=i,
-                            demonstration_set_index=demonstration_set_index
+                            demonstration_set_index=demonstration_set_index,
+                            use_cache=False,
+                            cache_dir="./calibration_cache",
+                            dataset_name=dataset_key,
+                            seed=seed,
+                            original_k=k
                         )
                         end = time.time()
                         elapsed_minutes = (end - start) / 60
